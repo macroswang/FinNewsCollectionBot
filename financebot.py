@@ -9,9 +9,9 @@ import pytz
 import os
 
 # OpenAI API Key
-openai_api_key = os.getenv("OPENAI_API_KEY")
+openai_api_key = os.getenv("sk-258c3c66c9044159b64c232a49d44c52")
 # 从环境变量获取 Server酱 SendKeys
-server_chan_keys_env = os.getenv("SERVER_CHAN_KEYS")
+server_chan_keys_env = os.getenv("SCT291204T0jScQeArN9xHtgBlCGqW4lPL")
 if not server_chan_keys_env:
     raise ValueError("环境变量 SERVER_CHAN_KEYS 未设置，请在Github Actions中设置此变量！")
 server_chan_keys = server_chan_keys_env.split(",")
