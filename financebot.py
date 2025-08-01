@@ -265,14 +265,16 @@ def get_real_time_stock_data(stock_code):
         else:
             ticker = f"{stock_code}.SZ"  # 深圳证券交易所
         
+        print(f"🔍 正在获取 {ticker} 的数据...")
+        
         # 获取股票信息
         stock = yf.Ticker(ticker)
-        info = stock.info
         
         # 获取历史数据用于技术分析
         hist = stock.history(period="3mo")
         
         if hist.empty:
+            print(f"⚠️ {stock_code} 历史数据为空")
             return None
             
         # 计算技术指标
@@ -293,7 +295,21 @@ def get_real_time_stock_data(stock_code):
         current_volume = hist['Volume'].iloc[-1]
         volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
         
-        return {
+        # 获取基本面信息（添加错误处理）
+        try:
+            info = stock.info
+            pe_ratio = info.get('trailingPE', 'N/A')
+            pb_ratio = info.get('priceToBook', 'N/A')
+            market_cap = info.get('marketCap', 'N/A')
+            volume = info.get('volume', 'N/A')
+        except Exception as e:
+            print(f"⚠️ 获取{stock_code}基本面数据失败: {e}")
+            pe_ratio = 'N/A'
+            pb_ratio = 'N/A'
+            market_cap = 'N/A'
+            volume = 'N/A'
+        
+        result = {
             "current_price": round(current_price, 2),
             "price_change": round(price_change, 2),
             "volume_ratio": round(volume_ratio, 2),
@@ -301,13 +317,17 @@ def get_real_time_stock_data(stock_code):
             "ma50": round(ma50, 2),
             "recent_high": round(recent_high, 2),
             "recent_low": round(recent_low, 2),
-            "pe_ratio": info.get('trailingPE', 'N/A'),
-            "pb_ratio": info.get('priceToBook', 'N/A'),
-            "market_cap": info.get('marketCap', 'N/A'),
-            "volume": info.get('volume', 'N/A')
+            "pe_ratio": pe_ratio,
+            "pb_ratio": pb_ratio,
+            "market_cap": market_cap,
+            "volume": volume
         }
+        
+        print(f"✅ {stock_code} 数据获取成功: ¥{result['current_price']} ({result['price_change']}%)")
+        return result
+        
     except Exception as e:
-        print(f"⚠️ 获取{stock_code}实时数据失败: {e}")
+        print(f"❌ 获取{stock_code}实时数据失败: {e}")
         return None
 
 # 获取具体股票推荐（增强版）
@@ -604,39 +624,45 @@ if __name__ == "__main__":
                         stock_recommendations += f"  - 影响程度: {stock['impact']}\n"
                     
                     # 获取实时数据
-                    print(f"📊 正在获取{stock['code']}的实时数据...")
-                    real_time_data = get_real_time_stock_data(stock['code'])
-                    
-                    if real_time_data:
-                        # 实时价格和涨跌幅
-                        price_change_emoji = "📈" if real_time_data["price_change"] > 0 else "📉" if real_time_data["price_change"] < 0 else "➡️"
-                        stock_recommendations += f"  - **实时价格**: ¥{real_time_data['current_price']} {price_change_emoji} {real_time_data['price_change']}%\n"
+                    try:
+                        print(f"📊 正在获取{stock['code']}的实时数据...")
+                        real_time_data = get_real_time_stock_data(stock['code'])
                         
-                        # 基本面数据
-                        if real_time_data["pe_ratio"] != 'N/A':
-                            stock_recommendations += f"  - **估值**: PE{real_time_data['pe_ratio']:.1f} | PB{real_time_data['pb_ratio']:.2f if real_time_data['pb_ratio'] != 'N/A' else 'N/A'}\n"
-                        
-                        # 技术面分析
-                        trend = "上涨" if real_time_data["current_price"] > real_time_data["ma20"] else "下跌" if real_time_data["current_price"] < real_time_data["ma20"] else "震荡"
-                        stock_recommendations += f"  - **技术面**: {trend} | MA20:¥{real_time_data['ma20']} | MA50:¥{real_time_data['ma50']}\n"
-                        
-                        # 支撑阻力位
-                        stock_recommendations += f"  - **支撑/阻力**: ¥{real_time_data['recent_low']} / ¥{real_time_data['recent_high']}\n"
-                        
-                        # 成交量分析
-                        volume_emoji = "🔥" if real_time_data["volume_ratio"] > 1.5 else "📊" if real_time_data["volume_ratio"] > 1 else "📉"
-                        stock_recommendations += f"  - **成交量**: {volume_emoji} {real_time_data['volume_ratio']:.1f}倍\n"
-                        
-                        # 交易建议（基于实时数据）
-                        entry_price = real_time_data["current_price"] * 0.95  # 建议在现价5%以下买入
-                        stop_loss = real_time_data["current_price"] * 0.92    # 止损设在现价8%以下
-                        target_price = real_time_data["current_price"] * 1.15  # 目标价设在现价15%以上
-                        
-                        stock_recommendations += f"  - **买入建议**: ¥{entry_price:.2f}以下\n"
-                        stock_recommendations += f"  - **止损位**: ¥{stop_loss:.2f}\n"
-                        stock_recommendations += f"  - **目标价**: ¥{target_price:.2f}\n"
-                    else:
-                        stock_recommendations += f"  - **数据获取失败**，请手动查询\n"
+                        if real_time_data:
+                            # 实时价格和涨跌幅
+                            price_change_emoji = "📈" if real_time_data["price_change"] > 0 else "📉" if real_time_data["price_change"] < 0 else "➡️"
+                            stock_recommendations += f"  - **实时价格**: ¥{real_time_data['current_price']} {price_change_emoji} {real_time_data['price_change']}%\n"
+                            
+                            # 基本面数据
+                            if real_time_data["pe_ratio"] != 'N/A' and real_time_data["pe_ratio"] is not None:
+                                pe_str = f"{real_time_data['pe_ratio']:.1f}" if isinstance(real_time_data['pe_ratio'], (int, float)) else str(real_time_data['pe_ratio'])
+                                pb_str = f"{real_time_data['pb_ratio']:.2f}" if real_time_data['pb_ratio'] != 'N/A' and real_time_data['pb_ratio'] is not None and isinstance(real_time_data['pb_ratio'], (int, float)) else 'N/A'
+                                stock_recommendations += f"  - **估值**: PE{pe_str} | PB{pb_str}\n"
+                            
+                            # 技术面分析
+                            trend = "上涨" if real_time_data["current_price"] > real_time_data["ma20"] else "下跌" if real_time_data["current_price"] < real_time_data["ma20"] else "震荡"
+                            stock_recommendations += f"  - **技术面**: {trend} | MA20:¥{real_time_data['ma20']:.2f} | MA50:¥{real_time_data['ma50']:.2f}\n"
+                            
+                            # 支撑阻力位
+                            stock_recommendations += f"  - **支撑/阻力**: ¥{real_time_data['recent_low']:.2f} / ¥{real_time_data['recent_high']:.2f}\n"
+                            
+                            # 成交量分析
+                            volume_emoji = "🔥" if real_time_data["volume_ratio"] > 1.5 else "📊" if real_time_data["volume_ratio"] > 1 else "📉"
+                            stock_recommendations += f"  - **成交量**: {volume_emoji} {real_time_data['volume_ratio']:.1f}倍\n"
+                            
+                            # 交易建议（基于实时数据）
+                            entry_price = real_time_data["current_price"] * 0.95  # 建议在现价5%以下买入
+                            stop_loss = real_time_data["current_price"] * 0.92    # 止损设在现价8%以下
+                            target_price = real_time_data["current_price"] * 1.15  # 目标价设在现价15%以上
+                            
+                            stock_recommendations += f"  - **买入建议**: ¥{entry_price:.2f}以下\n"
+                            stock_recommendations += f"  - **止损位**: ¥{stop_loss:.2f}\n"
+                            stock_recommendations += f"  - **目标价**: ¥{target_price:.2f}\n"
+                        else:
+                            stock_recommendations += f"  - **数据获取失败**，请手动查询\n"
+                    except Exception as e:
+                        print(f"⚠️ 处理{stock['code']}数据时出错: {e}")
+                        stock_recommendations += f"  - **数据处理错误**，请手动查询\n"
                     
                     stock_recommendations += "\n"
         stock_recommendations += "⚠️ **投资提醒**: 以上推荐基于今日新闻动态生成，仅供参考，投资有风险，入市需谨慎！\n\n"
