@@ -21,7 +21,7 @@ if not server_chan_keys_env:
     raise ValueError("环境变量 SERVER_CHAN_KEYS 未设置，请在Github Actions中设置此变量！")
 server_chan_keys = server_chan_keys_env.split(",")
 
-openai_client = OpenAI(api_key=openai_api_key)
+openai_client = OpenAI(api_key=openai_api_key, base_url="https://api.deepseek.com/v1")
 
 # RSS源地址列表
 rss_feeds = {
@@ -141,7 +141,7 @@ def summarize(text, global_events=None):
         """
         
         completion = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="deepseek-chat",
             messages=[
                 {"role": "system", "content": """
                  你是一名专业的财经新闻分析师，请根据以下新闻内容和全球市场联动分析，按照以下步骤完成任务：
@@ -276,7 +276,7 @@ def get_specific_stock_recommendations(industry, news_summary):
         """
 
         completion = openai_client.chat.completions.create(
-            model="gpt-4o",
+            model="deepseek-chat",
             messages=[
                 {"role": "system", "content": "你是一个专业的股票分析师，请基于行业分析推荐相关股票。"},
                 {"role": "user", "content": prompt}
