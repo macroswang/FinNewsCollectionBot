@@ -190,39 +190,23 @@ def summarize(text, global_events=None):
 请关注以上新闻对市场的影响。
         """
 
-# 获取市场情绪数据（增强版）
+# 获取市场情绪数据（模拟）
 def get_market_sentiment():
-    """获取市场情绪数据，包含更详细的市场状态分析"""
+    """获取市场情绪数据，这里使用模拟数据"""
     return {
         "上证指数": "📈 上涨趋势",
         "深证成指": "📊 震荡整理", 
         "创业板指": "📈 强势反弹",
         "北向资金": "💰 净流入",
-        "市场情绪": "😊 偏乐观",
-        "成交量": "📊 温和放量",
-        "板块轮动": "🔄 科技→消费→新能源",
-        "资金流向": "💸 主力资金净流入",
-        "技术形态": "📈 突破关键阻力位"
+        "市场情绪": "😊 偏乐观"
     }
 
-# 市场时机分析
-def analyze_market_timing():
-    """分析当前市场时机，判断是否适合建仓"""
-    timing_analysis = {
-        "整体时机": "🟡 中性偏乐观",
-        "建仓建议": "分批建仓，控制仓位",
-        "风险提示": "关注外部风险事件",
-        "重点关注": "业绩确定性强的龙头股",
-        "操作策略": "逢低买入，不追高"
-    }
-    return timing_analysis
-
-# 获取具体股票推荐（增强版）
+# 获取具体股票推荐
 def get_specific_stock_recommendations(industry, news_summary):
-    """基于行业和新闻摘要获取具体股票推荐，包含基本面、技术面和买卖点分析"""
+    """基于行业和新闻摘要获取具体股票推荐"""
     try:
         prompt = f"""
-        基于以下{industry}行业的新闻分析，推荐3-5只最相关的A股股票，并提供完整的投资分析：
+        基于以下{industry}行业的新闻分析，推荐3-5只最相关的A股股票：
 
         行业分析：{news_summary}
 
@@ -234,45 +218,15 @@ def get_specific_stock_recommendations(industry, news_summary):
                     "name": "股票名称", 
                     "reason": "推荐理由（基于行业分析）",
                     "risk": "风险等级（低/中/高）",
-                    "impact": "影响程度（高/中/低）",
-                    "fundamental": {{
-                        "pe_ratio": "市盈率估值",
-                        "pb_ratio": "市净率估值", 
-                        "roe": "净资产收益率",
-                        "debt_ratio": "负债率",
-                        "growth": "成长性评估"
-                    }},
-                    "technical": {{
-                        "trend": "技术趋势（上涨/下跌/震荡）",
-                        "support": "支撑位",
-                        "resistance": "阻力位",
-                        "volume": "成交量分析",
-                        "momentum": "动量指标"
-                    }},
-                    "trading": {{
-                        "entry_price": "建议买入价格区间",
-                        "stop_loss": "止损位",
-                        "target_price": "目标价格",
-                        "holding_period": "建议持有周期",
-                        "exit_strategy": "退出策略"
-                    }},
-                    "research": {{
-                        "analyst_rating": "分析师评级",
-                        "target_price_avg": "平均目标价",
-                        "upside_potential": "上涨空间",
-                        "key_risks": "主要风险因素"
-                    }}
+                    "impact": "影响程度（高/中/低）"
                 }}
             ]
         }}
 
         要求：
         1. 股票必须与行业分析直接相关
-        2. 基本面分析要客观评估估值水平
-        3. 技术面分析要结合当前市场环境
-        4. 买卖点建议要具体可操作
-        5. 研报分析要参考市场共识
-        6. 只返回JSON格式，不要其他文字
+        2. 推荐理由要基于分析中的具体逻辑
+        3. 只返回JSON格式，不要其他文字
         """
 
         completion = openai_client.chat.completions.create(
@@ -476,9 +430,8 @@ if __name__ == "__main__":
     # 每个网站获取最多 5 篇文章
     articles_data, analysis_text = fetch_rss_articles(rss_feeds, max_articles=5)
     
-    # 获取市场情绪数据和时机分析
+    # 获取市场情绪数据
     sentiment_data = get_market_sentiment()
-    timing_analysis = analyze_market_timing()
     
     # 从新闻中提取相关行业（包含全球联动分析）
     related_industries, global_events = extract_industries_from_news(analysis_text)
@@ -489,17 +442,11 @@ if __name__ == "__main__":
     # AI生成摘要（包含全球联动分析）
     summary = summarize(analysis_text, global_events)
 
-    # 生成市场情绪和时机分析部分
+    # 生成市场情绪部分
     sentiment_section = "## 📊 市场情绪概览\n"
     for key, value in sentiment_data.items():
         sentiment_section += f"- **{key}**: {value}\n"
     sentiment_section += "\n"
-    
-    # 添加市场时机分析
-    timing_section = "## ⏰ 市场时机分析\n"
-    for key, value in timing_analysis.items():
-        timing_section += f"- **{key}**: {value}\n"
-    timing_section += "\n"
     
     # 生成全球联动分析部分
     global_analysis = ""
@@ -529,55 +476,11 @@ if __name__ == "__main__":
                     stock_recommendations += f"  - 风险等级: {stock['risk']}\n"
                     if stock.get("impact"):
                         stock_recommendations += f"  - 影响程度: {stock['impact']}\n"
-                    
-                    # 基本面分析
-                    if stock.get("fundamental"):
-                        fund = stock["fundamental"]
-                        stock_recommendations += f"  - **基本面**: PE{fund.get('pe_ratio', 'N/A')} | PB{fund.get('pb_ratio', 'N/A')} | ROE{fund.get('roe', 'N/A')}\n"
-                    
-                    # 技术面分析
-                    if stock.get("technical"):
-                        tech = stock["technical"]
-                        stock_recommendations += f"  - **技术面**: {tech.get('trend', 'N/A')} | 支撑{tech.get('support', 'N/A')} | 阻力{tech.get('resistance', 'N/A')}\n"
-                    
-                    # 交易建议
-                    if stock.get("trading"):
-                        trade = stock["trading"]
-                        stock_recommendations += f"  - **买入**: {trade.get('entry_price', 'N/A')}\n"
-                        stock_recommendations += f"  - **止损**: {trade.get('stop_loss', 'N/A')}\n"
-                        stock_recommendations += f"  - **目标**: {trade.get('target_price', 'N/A')}\n"
-                        stock_recommendations += f"  - **持有**: {trade.get('holding_period', 'N/A')}\n"
-                    
-                    # 研报分析
-                    if stock.get("research"):
-                        research = stock["research"]
-                        stock_recommendations += f"  - **评级**: {research.get('analyst_rating', 'N/A')} | 目标价{research.get('target_price_avg', 'N/A')}\n"
-                        stock_recommendations += f"  - **空间**: {research.get('upside_potential', 'N/A')}\n"
-                    
                     stock_recommendations += "\n"
         stock_recommendations += "⚠️ **投资提醒**: 以上推荐基于今日新闻动态生成，仅供参考，投资有风险，入市需谨慎！\n\n"
-        
-        # 添加投资策略建议
-        strategy_section = "## 💡 投资策略建议\n\n"
-        strategy_section += "### 📈 建仓策略\n"
-        strategy_section += "- **分批建仓**: 建议分3-5次逐步建仓，降低单次风险\n"
-        strategy_section += "- **仓位控制**: 单只股票不超过总仓位的10-15%\n"
-        strategy_section += "- **时机把握**: 关注回调机会，避免追高\n\n"
-        
-        strategy_section += "### 🛡️ 风险控制\n"
-        strategy_section += "- **止损设置**: 严格执行止损，一般不超过-8%\n"
-        strategy_section += "- **止盈策略**: 分批止盈，锁定部分利润\n"
-        strategy_section += "- **分散投资**: 避免过度集中在单一行业\n\n"
-        
-        strategy_section += "### 📊 持仓管理\n"
-        strategy_section += "- **定期检视**: 每周评估持仓表现\n"
-        strategy_section += "- **动态调整**: 根据市场变化调整仓位\n"
-        strategy_section += "- **长期思维**: 优质股票可长期持有\n\n"
-        
-        stock_recommendations += strategy_section
 
     # 生成仅展示标题和链接的最终消息
-    final_summary = f"📅 **{today_str} 财经新闻摘要**\n\n{sentiment_section}{timing_section}{global_analysis}✍️ **今日分析总结：**\n{summary}\n\n{stock_recommendations}---\n\n"
+    final_summary = f"📅 **{today_str} 财经新闻摘要**\n\n{sentiment_section}{global_analysis}✍️ **今日分析总结：**\n{summary}\n\n{stock_recommendations}---\n\n"
     for category, content in articles_data.items():
         if content.strip():
             final_summary += f"## {category}\n{content}\n\n"
