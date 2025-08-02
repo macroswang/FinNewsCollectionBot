@@ -330,9 +330,169 @@ def get_real_time_stock_data(stock_code):
         print(f"❌ 获取{stock_code}实时数据失败: {e}")
         return None
 
-# 获取具体股票推荐（增强版）
+# 获取股票行业分类（动态获取）
+def get_stock_industry(stock_code):
+    """动态获取股票的行业分类"""
+    try:
+        # 转换A股代码格式
+        if stock_code.startswith('6'):
+            ticker = f"{stock_code}.SS"
+        else:
+            ticker = f"{stock_code}.SZ"
+        
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        # 获取行业信息
+        sector = info.get('sector', '')
+        industry = info.get('industry', '')
+        
+        # 映射到中文行业分类
+        industry_mapping = {
+            # 科技相关
+            'Technology': '科技',
+            'Semiconductors': '半导体',
+            'Software': '软件',
+            'Hardware': '硬件',
+            'Consumer Electronics': '消费电子',
+            'Electronic Components': '科技',
+            
+            # 新能源相关
+            'Energy': '能源',
+            'Renewable Energy': '新能源',
+            'Utilities': '公用事业',
+            'Electric Utilities': '电力',
+            'Utilities - Renewable': '新能源',
+            'Electrical Equipment & Parts': '新能源',
+            
+            # 医药相关
+            'Healthcare': '医药',
+            'Biotechnology': '生物科技',
+            'Pharmaceuticals': '制药',
+            'Medical Devices': '医药',  # 医疗器械也归类为医药
+            'Medical Care Facilities': '医药',
+            'Diagnostics & Research': '医药',
+            
+            # 消费相关
+            'Consumer Defensive': '消费',
+            'Consumer Cyclical': '消费',
+            'Food & Beverage': '食品饮料',
+            'Retail': '零售',
+            'Beverages - Wineries & Distilleries': '消费',
+            'Auto Manufacturers': '新能源',  # 比亚迪等新能源汽车制造商
+            
+            # 金融相关
+            'Financial Services': '银行',  # 金融服务归类为银行
+            'Banks': '银行',
+            'Banks - Regional': '银行',
+            'Insurance': '保险',
+            
+            # 工业相关
+            'Industrials': '工业',
+            'Manufacturing': '制造',
+            'Construction': '基建',
+            'Engineering & Construction': '基建',
+            
+            # 材料相关
+            'Basic Materials': '材料',
+            'Chemicals': '化工',
+            'Specialty Chemicals': '化工',
+            'Metals & Mining': '金属矿业',
+            
+            # 其他
+            'Real Estate': '房地产',
+            'Communication Services': '通信',
+            'Transportation': '运输'
+        }
+        
+        # 优先使用industry，如果没有则使用sector
+        mapped_industry = industry_mapping.get(industry, industry_mapping.get(sector, ''))
+        
+        if mapped_industry:
+            return mapped_industry
+        else:
+            # 如果无法获取，使用备用分类
+            return get_fallback_industry(stock_code)
+            
+    except Exception as e:
+        print(f"⚠️ 获取{stock_code}行业分类失败: {e}")
+        return get_fallback_industry(stock_code)
+
+# 备用行业分类（当动态获取失败时使用）
+def get_fallback_industry(stock_code):
+    """基于股票代码的备用行业分类"""
+    # 基于股票代码的行业分类（部分知名股票）
+    stock_industry_map = {
+        # 新能源
+        "300750": "新能源",  # 宁德时代
+        "002594": "新能源",  # 比亚迪
+        "300274": "新能源",  # 阳光电源
+        "002129": "新能源",  # 中环股份
+        "601012": "新能源",  # 隆基绿能
+        
+        # 半导体
+        "688981": "半导体",  # 中芯国际
+        "002049": "半导体",  # 紫光国微
+        "688536": "半导体",  # 思瑞浦
+        "603986": "半导体",  # 兆易创新
+        "688012": "半导体",  # 中微公司
+        "688396": "半导体",  # 华润微
+        "688019": "半导体",  # 安集科技
+        
+        # 医药
+        "300015": "医药",    # 爱尔眼科
+        "600276": "医药",    # 恒瑞医药
+        "300760": "医药",    # 迈瑞医疗
+        "603259": "医药",    # 药明康德
+        "300122": "医药",    # 智飞生物
+        "002007": "医药",    # 华兰生物
+        
+        # 消费
+        "000858": "消费",    # 五粮液
+        "600519": "消费",    # 贵州茅台
+        "002304": "消费",    # 洋河股份
+        "000568": "消费",    # 泸州老窖
+        "600809": "消费",    # 山西汾酒
+        
+        # 科技
+        "000002": "房地产",  # 万科A
+        "000001": "银行",    # 平安银行
+        "600036": "银行",    # 招商银行
+        "002475": "科技",    # 立讯精密
+        "000725": "科技",    # 京东方A
+        "002415": "科技",    # 海康威视
+        
+        # 基建
+        "600900": "新能源",  # 长江电力 - 实际上是水电可再生能源
+        "601668": "基建",    # 中国建筑
+        "601390": "基建",    # 中国中铁
+        "601186": "基建",    # 中国铁建
+        "600068": "基建",    # 葛洲坝
+        
+        # 银行
+        "601398": "银行",    # 工商银行
+        "601939": "银行",    # 建设银行
+        "601988": "银行",    # 中国银行
+        "600000": "银行",    # 浦发银行
+        
+        # 化工
+        "600309": "化工",    # 万华化学
+        "002648": "化工",    # 卫星化学
+        "600426": "化工",    # 华鲁恒升
+        "002601": "化工",    # 龙佰集团
+    }
+    
+    return stock_industry_map.get(stock_code, "其他")
+
+# 验证股票是否属于指定行业
+def verify_stock_industry(stock_code, target_industry):
+    """验证股票是否属于指定行业"""
+    actual_industry = get_stock_industry(stock_code)
+    return actual_industry == target_industry
+
+# 获取具体股票推荐（修复版）
 def get_specific_stock_recommendations(industry, news_summary):
-    """基于行业和新闻摘要获取具体股票推荐，包含实时基本面、技术面和买卖点分析"""
+    """基于行业和新闻摘要获取具体股票推荐，确保股票行业分类准确"""
     try:
         prompt = f"""
         基于以下{industry}行业的新闻分析，推荐3-5只最相关的A股股票，并提供完整的投资分析：
@@ -353,15 +513,16 @@ def get_specific_stock_recommendations(industry, news_summary):
         }}
 
         要求：
-        1. 股票必须与行业分析直接相关
+        1. 股票必须与{industry}行业分析直接相关
         2. 只返回股票代码、名称、推荐理由、风险等级和影响程度
         3. 只返回JSON格式，不要其他文字
+        4. 确保推荐的股票确实属于{industry}行业
         """
 
         completion = openai_client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "你是一个专业的股票分析师，请基于行业分析推荐相关股票。"},
+                {"role": "system", "content": f"你是一个专业的股票分析师，请基于{industry}行业分析推荐相关股票，确保推荐的股票确实属于该行业。"},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3
@@ -372,18 +533,35 @@ def get_specific_stock_recommendations(industry, news_summary):
         try:
             import json
             result = json.loads(response_text)
-            return result.get("stocks", [])
+            stocks = result.get("stocks", [])
+            
+            # 验证股票行业分类
+            verified_stocks = []
+            for stock in stocks:
+                if verify_stock_industry(stock["code"], industry):
+                    verified_stocks.append(stock)
+                    print(f"✅ {stock['code']} {stock['name']} 验证为{industry}行业")
+                else:
+                    actual_industry = get_stock_industry(stock["code"])
+                    print(f"❌ {stock['code']} {stock['name']} 实际为{actual_industry}行业，不属于{industry}行业，已过滤")
+            
+            if verified_stocks:
+                return verified_stocks
+            else:
+                print(f"⚠️ {industry}行业没有找到合适的股票，使用备用推荐")
+                return get_fallback_stocks_by_industry(industry)
+                
         except json.JSONDecodeError:
             print(f"⚠️ AI返回格式错误，使用备用推荐")
-            return get_fallback_stocks(industry)
+            return get_fallback_stocks_by_industry(industry)
             
     except Exception as e:
         print(f"⚠️ 股票推荐失败: {e}")
-        return get_fallback_stocks(industry)
+        return get_fallback_stocks_by_industry(industry)
 
-# 备用股票推荐（当动态推荐失败时使用）
-def get_fallback_stocks(industry):
-    """备用股票推荐模板"""
+# 按行业获取备用股票推荐
+def get_fallback_stocks_by_industry(industry):
+    """按行业获取备用股票推荐"""
     stock_templates = {
         "新能源": [
             {"code": "300750", "name": "宁德时代", "reason": "动力电池龙头，技术领先", "risk": "中", "impact": "高"},
@@ -406,17 +584,32 @@ def get_fallback_stocks(industry):
             {"code": "002304", "name": "洋河股份", "reason": "白酒行业领先", "risk": "中", "impact": "中"}
         ],
         "科技": [
-            {"code": "000002", "name": "万科A", "reason": "房地产龙头", "risk": "高", "impact": "中"},
-            {"code": "000001", "name": "平安银行", "reason": "银行股龙头", "risk": "低", "impact": "中"},
-            {"code": "600036", "name": "招商银行", "reason": "零售银行领先", "risk": "低", "impact": "中"}
+            {"code": "002475", "name": "立讯精密", "reason": "消费电子制造龙头", "risk": "中", "impact": "高"},
+            {"code": "000725", "name": "京东方A", "reason": "显示面板龙头", "risk": "中", "impact": "中"},
+            {"code": "002415", "name": "海康威视", "reason": "安防设备龙头", "risk": "中", "impact": "中"}
+        ],
+        "基建": [
+            {"code": "601668", "name": "中国建筑", "reason": "建筑行业龙头", "risk": "中", "impact": "中"},
+            {"code": "601390", "name": "中国中铁", "reason": "铁路建设龙头", "risk": "中", "impact": "中"},
+            {"code": "601186", "name": "中国铁建", "reason": "基建工程龙头", "risk": "中", "impact": "中"}
+        ],
+        "银行": [
+            {"code": "000001", "name": "平安银行", "reason": "零售银行领先", "risk": "低", "impact": "中"},
+            {"code": "600036", "name": "招商银行", "reason": "零售银行龙头", "risk": "低", "impact": "中"},
+            {"code": "601398", "name": "工商银行", "reason": "国有大行龙头", "risk": "低", "impact": "中"}
+        ],
+        "化工": [
+            {"code": "600309", "name": "万华化学", "reason": "化工龙头，MDI全球领先", "risk": "中", "impact": "中"},
+            {"code": "002648", "name": "卫星化学", "reason": "石化新材料龙头", "risk": "中", "impact": "中"},
+            {"code": "600426", "name": "华鲁恒升", "reason": "煤化工龙头", "risk": "中", "impact": "中"}
         ]
     }
     return stock_templates.get(industry, [])
 
 # 生成股票推荐模板（保持向后兼容）
 def generate_stock_recommendations(industry):
-    """基于行业生成股票推荐模板（已废弃，使用get_dynamic_stock_recommendations）"""
-    return get_fallback_stocks(industry)
+    """基于行业生成股票推荐模板（已废弃，使用get_specific_stock_recommendations）"""
+    return get_fallback_stocks_by_industry(industry)
 
 # 全球事件联动分析系统
 def analyze_global_market_linkage(news_text):
@@ -552,8 +745,37 @@ def send_to_wechat(title, content):
         else:
             print(f"❌ 推送失败: {key}, 响应：{response.text}")
 
+# 测试股票行业分类功能
+def test_stock_industry_classification():
+    """测试股票行业分类功能"""
+    print("🧪 开始测试股票行业分类功能...")
+    
+    test_stocks = [
+        ("300750", "宁德时代", "新能源"),
+        ("002594", "比亚迪", "新能源"),
+        ("688981", "中芯国际", "半导体"),
+        ("603986", "兆易创新", "半导体"),
+        ("300015", "爱尔眼科", "医药"),
+        ("603259", "药明康德", "医药"),
+        ("000858", "五粮液", "消费"),
+        ("600519", "贵州茅台", "消费"),
+        ("002475", "立讯精密", "科技"),
+        ("600900", "长江电力", "新能源"),
+        ("000001", "平安银行", "银行"),
+        ("600309", "万华化学", "化工")
+    ]
+    
+    for code, name, expected_industry in test_stocks:
+        actual_industry = get_stock_industry(code)
+        status = "✅" if actual_industry == expected_industry else "❌"
+        print(f"{status} {code} {name}: 期望{expected_industry}, 实际{actual_industry}")
+    
+    print("🧪 股票行业分类测试完成\n")
 
 if __name__ == "__main__":
+    # 运行行业分类测试
+    test_stock_industry_classification()
+    
     today_str = today_date().strftime("%Y-%m-%d")
 
     # 每个网站获取最多 5 篇文章
@@ -615,6 +837,12 @@ if __name__ == "__main__":
             if stocks:
                 stock_recommendations += f"### 📈 {industry}板块\n"
                 for stock in stocks[:3]:  # 每个行业最多3只股票
+                    # 再次验证股票行业分类
+                    if not verify_stock_industry(stock["code"], industry):
+                        actual_industry = get_stock_industry(stock["code"])
+                        print(f"⚠️ 跳过{stock['code']} {stock['name']}，实际为{actual_industry}行业，不属于{industry}行业")
+                        continue
+                        
                     risk_emoji = {"低": "🟢", "中": "🟡", "高": "🔴"}.get(stock["risk"], "⚪")
                     impact_emoji = {"高": "🔥", "中": "⚡", "低": "💡"}.get(stock.get("impact", "中"), "💡")
                     stock_recommendations += f"- **{stock['code']} {stock['name']}** {risk_emoji} {impact_emoji}\n"
