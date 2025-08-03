@@ -334,17 +334,127 @@ def get_market_indices():
             "创业板指": "📊 数据获取中"
         }
 
-# 获取实时股票数据
+# 导入实时数据获取模块
+try:
+    from real_time_stock_data import RealTimeStockData
+    realtime_data_client = RealTimeStockData()
+    REALTIME_DATA_AVAILABLE = True
+    print("✅ 实时数据模块加载成功")
+except ImportError:
+    print("⚠️ 实时数据模块未找到，将使用yfinance作为备用")
+    REALTIME_DATA_AVAILABLE = False
+
+# 获取实时股票数据（增强版）
 def get_real_time_stock_data(stock_code):
-    """获取股票的实时数据"""
+    """获取股票的实时数据（优先使用实时数据源，备用yfinance）"""
     try:
+        # 首先尝试获取实时数据
+        if REALTIME_DATA_AVAILABLE:
+            print(f"🔍 正在获取 {stock_code} 的实时数据...")
+            realtime_data = realtime_data_client.get_realtime_data_multi_source(stock_code)
+            
+            if realtime_data and realtime_data.get("current_price", 0) > 0:
+                # 获取技术指标数据（使用yfinance）
+                try:
+                    # 转换A股代码格式（添加.SS或.SZ后缀）
+                    if stock_code.startswith('6'):
+                        ticker = f"{stock_code}.SS"  # 上海证券交易所
+                    else:
+                        ticker = f"{stock_code}.SZ"  # 深圳证券交易所
+                    
+                    stock = yf.Ticker(ticker)
+                    hist = stock.history(period="3mo")
+                    
+                    if not hist.empty:
+                        # 计算技术指标
+                        ma20 = hist['Close'].rolling(window=20).mean().iloc[-1]
+                        ma50 = hist['Close'].rolling(window=50).mean().iloc[-1]
+                        recent_high = hist['High'].tail(20).max()
+                        recent_low = hist['Low'].tail(20).min()
+                        
+                        # 计算成交量变化
+                        avg_volume = hist['Volume'].tail(20).mean()
+                        current_volume = realtime_data.get("volume", 0)
+                        volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
+                        
+                        # 获取基本面信息
+                        try:
+                            info = stock.info
+                            pe_ratio = info.get('trailingPE', 'N/A')
+                            pb_ratio = info.get('priceToBook', 'N/A')
+                            market_cap = info.get('marketCap', 'N/A')
+                        except Exception as e:
+                            print(f"⚠️ 获取{stock_code}基本面数据失败: {e}")
+                            pe_ratio = 'N/A'
+                            pb_ratio = 'N/A'
+                            market_cap = 'N/A'
+                        
+                        result = {
+                            "current_price": realtime_data["current_price"],
+                            "price_change": realtime_data["price_change"],
+                            "volume_ratio": round(volume_ratio, 2),
+                            "ma20": round(ma20, 2),
+                            "ma50": round(ma50, 2),
+                            "recent_high": round(recent_high, 2),
+                            "recent_low": round(recent_low, 2),
+                            "pe_ratio": pe_ratio,
+                            "pb_ratio": pb_ratio,
+                            "market_cap": market_cap,
+                            "volume": realtime_data.get("volume", 0),
+                            "data_source": realtime_data.get("data_source", "实时数据"),
+                            "update_time": realtime_data.get("update_time", "未知")
+                        }
+                        
+                        print(f"✅ {stock_code} 实时数据获取成功: ¥{result['current_price']} ({result['price_change']}%) - {result['data_source']}")
+                        return result
+                    else:
+                        print(f"⚠️ {stock_code} 技术指标数据为空，使用纯实时数据")
+                        # 返回纯实时数据
+                        result = {
+                            "current_price": realtime_data["current_price"],
+                            "price_change": realtime_data["price_change"],
+                            "volume_ratio": 1.0,
+                            "ma20": realtime_data["current_price"],
+                            "ma50": realtime_data["current_price"],
+                            "recent_high": realtime_data.get("high_price", realtime_data["current_price"]),
+                            "recent_low": realtime_data.get("low_price", realtime_data["current_price"]),
+                            "pe_ratio": 'N/A',
+                            "pb_ratio": 'N/A',
+                            "market_cap": 'N/A',
+                            "volume": realtime_data.get("volume", 0),
+                            "data_source": realtime_data.get("data_source", "实时数据"),
+                            "update_time": realtime_data.get("update_time", "未知")
+                        }
+                        return result
+                        
+                except Exception as e:
+                    print(f"⚠️ 获取{stock_code}技术指标失败: {e}")
+                    # 返回纯实时数据
+                    result = {
+                        "current_price": realtime_data["current_price"],
+                        "price_change": realtime_data["price_change"],
+                        "volume_ratio": 1.0,
+                        "ma20": realtime_data["current_price"],
+                        "ma50": realtime_data["current_price"],
+                        "recent_high": realtime_data.get("high_price", realtime_data["current_price"]),
+                        "recent_low": realtime_data.get("low_price", realtime_data["current_price"]),
+                        "pe_ratio": 'N/A',
+                        "pb_ratio": 'N/A',
+                        "market_cap": 'N/A',
+                        "volume": realtime_data.get("volume", 0),
+                        "data_source": realtime_data.get("data_source", "实时数据"),
+                        "update_time": realtime_data.get("update_time", "未知")
+                    }
+                    return result
+        
+        # 如果实时数据不可用，使用yfinance作为备用
+        print(f"🔍 使用yfinance获取 {stock_code} 数据...")
+        
         # 转换A股代码格式（添加.SS或.SZ后缀）
         if stock_code.startswith('6'):
             ticker = f"{stock_code}.SS"  # 上海证券交易所
         else:
             ticker = f"{stock_code}.SZ"  # 深圳证券交易所
-        
-        print(f"🔍 正在获取 {ticker} 的数据...")
         
         # 获取股票信息
         stock = yf.Ticker(ticker)
@@ -399,10 +509,12 @@ def get_real_time_stock_data(stock_code):
             "pe_ratio": pe_ratio,
             "pb_ratio": pb_ratio,
             "market_cap": market_cap,
-            "volume": volume
+            "volume": volume,
+            "data_source": "yfinance(延迟数据)",
+            "update_time": "延迟数据"
         }
         
-        print(f"✅ {stock_code} 数据获取成功: ¥{result['current_price']} ({result['price_change']}%)")
+        print(f"✅ {stock_code} yfinance数据获取成功: ¥{result['current_price']} ({result['price_change']}%)")
         return result
         
     except Exception as e:
@@ -1105,7 +1217,10 @@ if __name__ == "__main__":
                     if real_time_data:
                         # 实时价格和涨跌幅
                         price_change_emoji = "📈" if real_time_data["price_change"] > 0 else "📉" if real_time_data["price_change"] < 0 else "➡️"
-                        stock_recommendations += f"  - **实时价格**: ¥{real_time_data['current_price']} {price_change_emoji} {real_time_data['price_change']}%\n"
+                        data_source_emoji = "⚡" if "实时" in real_time_data.get("data_source", "") else "📊"
+                        stock_recommendations += f"  - **实时价格**: ¥{real_time_data['current_price']} {price_change_emoji} {real_time_data['price_change']}% {data_source_emoji} {real_time_data.get('data_source', '未知')}\n"
+                        if real_time_data.get("update_time"):
+                            stock_recommendations += f"  - **更新时间**: {real_time_data['update_time']}\n"
                         
                         # 基本面数据
                         if real_time_data["pe_ratio"] != 'N/A' and real_time_data["pe_ratio"] is not None:
@@ -1171,7 +1286,10 @@ if __name__ == "__main__":
                     if real_time_data:
                         # 实时价格和涨跌幅
                         price_change_emoji = "📈" if real_time_data["price_change"] > 0 else "📉" if real_time_data["price_change"] < 0 else "➡️"
-                        stock_recommendations += f"  - **实时价格**: ¥{real_time_data['current_price']} {price_change_emoji} {real_time_data['price_change']}%\n"
+                        data_source_emoji = "⚡" if "实时" in real_time_data.get("data_source", "") else "📊"
+                        stock_recommendations += f"  - **实时价格**: ¥{real_time_data['current_price']} {price_change_emoji} {real_time_data['price_change']}% {data_source_emoji} {real_time_data.get('data_source', '未知')}\n"
+                        if real_time_data.get("update_time"):
+                            stock_recommendations += f"  - **更新时间**: {real_time_data['update_time']}\n"
                         
                         # 基本面数据
                         if real_time_data["pe_ratio"] != 'N/A' and real_time_data["pe_ratio"] is not None:
