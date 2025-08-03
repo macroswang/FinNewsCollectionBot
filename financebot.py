@@ -753,6 +753,19 @@ def extract_stock_recommendations_from_summary(summary):
     
     try:
         print(f"🔍 检查摘要内容: 包含'具体股票推荐'={'具体股票推荐' in summary}, 包含'热点板块股票'={'热点板块股票' in summary}, 包含'A股'={'A股' in summary}")
+        
+        # 添加调试信息，显示摘要中包含股票代码的行
+        lines = summary.split('\n')
+        stock_lines = []
+        for i, line in enumerate(lines):
+            if any(char.isdigit() for char in line) and len(line.strip()) > 5:
+                stock_lines.append(f"第{i+1}行: {line.strip()}")
+        
+        if stock_lines:
+            print(f"🔍 发现可能包含股票信息的行:")
+            for line in stock_lines[:5]:  # 只显示前5行
+                print(f"   {line}")
+        
         if "具体股票推荐" in summary or "热点板块股票" in summary or "A股" in summary:
             lines = summary.split('\n')
             in_hot_stocks = False
@@ -785,21 +798,39 @@ def extract_stock_recommendations_from_summary(summary):
                     in_rotation_stocks = False
                     continue
                 
-                # 提取股票信息
-                if (in_hot_stocks or in_rotation_stocks) and line.startswith('-') and len(line) > 2:
-                    print(f"🔍 正在处理股票信息行: {line}")
-                    print(f"🔍 当前状态: in_hot_stocks={in_hot_stocks}, in_rotation_stocks={in_rotation_stocks}")
-                    stock_info = line[1:].strip()
+                # 提取股票信息 - 放宽条件，支持多种格式
+                if (in_hot_stocks or in_rotation_stocks) and len(line) > 2:
+                    # 支持多种开头格式：-、•、*、数字等
+                    if line.startswith('-') or line.startswith('•') or line.startswith('*') or line[0].isdigit():
+                        print(f"🔍 正在处理股票信息行: {line}")
+                        print(f"🔍 当前状态: in_hot_stocks={in_hot_stocks}, in_rotation_stocks={in_rotation_stocks}")
+                        
+                        # 移除开头符号
+                        if line.startswith('-') or line.startswith('•') or line.startswith('*'):
+                            stock_info = line[1:].strip()
+                        else:
+                            stock_info = line.strip()
+                        
+                        # 跳过明显不是股票信息的行
+                        if len(stock_info) < 3 or stock_info.startswith('##') or stock_info.startswith('###'):
+                            continue
                     
-                    # 解析股票信息
+                    # 解析股票信息 - 支持多种格式
                     try:
-                        # 格式：股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                        # 尝试多种解析格式
+                        stock_code = None
+                        stock_name = None
+                        reason = "基于行业分析推荐"
+                        risk = "中"
+                        potential = "中"
+                        holding_period = "2-4天"
+                        entry_strategy = "回调买入"
+                        exit_strategy = "分批止盈"
+                        
+                        # 格式1：股票代码 股票名称: 详细信息
                         if ':' in stock_info or '：' in stock_info:
-                            # 优先使用英文冒号，如果没有则使用中文冒号
-                            if ':' in stock_info:
-                                stock_part, details_part = stock_info.split(':', 1)
-                            else:
-                                stock_part, details_part = stock_info.split('：', 1)
+                            separator = ':' if ':' in stock_info else '：'
+                            stock_part, details_part = stock_info.split(separator, 1)
                             
                             # 提取股票代码和名称
                             parts = stock_part.strip().split()
@@ -807,12 +838,7 @@ def extract_stock_recommendations_from_summary(summary):
                                 stock_code = parts[0]
                                 stock_name = parts[1]
                                 
-                                # 验证是否为A股股票代码（6位数字）
-                                if not (stock_code.isdigit() and len(stock_code) == 6):
-                                    print(f"⚠️ 跳过非A股股票代码: {stock_code}")
-                                    continue
-                                
-                                # 解析详细信息
+                                # 尝试解析详细信息
                                 details = details_part.split('，')
                                 if len(details) >= 6:
                                     reason = details[0]
@@ -821,25 +847,63 @@ def extract_stock_recommendations_from_summary(summary):
                                     holding_period = details[3]
                                     entry_strategy = details[4]
                                     exit_strategy = details[5]
-                                    
-                                    stock_data = {
-                                        "code": stock_code,
-                                        "name": stock_name,
-                                        "reason": reason,
-                                        "risk": risk,
-                                        "short_term_potential": potential,
-                                        "holding_period": holding_period,
-                                        "entry_strategy": entry_strategy,
-                                        "exit_strategy": exit_strategy,
-                                        "impact": "中"  # 默认值
-                                    }
-                                    
-                                    if in_hot_stocks:
-                                        stock_recommendations["hot_sector_stocks"].append(stock_data)
-                                        print(f"✅ 添加热点板块股票: {stock_code} {stock_name}")
-                                    elif in_rotation_stocks:
-                                        stock_recommendations["rotation_stocks"].append(stock_data)
-                                        print(f"✅ 添加轮动机会股票: {stock_code} {stock_name}")
+                        
+                        # 格式2：直接包含股票代码的行
+                        elif any(char.isdigit() for char in stock_info):
+                            # 查找6位数字的股票代码
+                            import re
+                            code_match = re.search(r'\b\d{6}\b', stock_info)
+                            if code_match:
+                                stock_code = code_match.group()
+                                # 尝试提取股票名称（股票代码前后的文字）
+                                parts = stock_info.split()
+                                for i, part in enumerate(parts):
+                                    if part == stock_code and i + 1 < len(parts):
+                                        stock_name = parts[i + 1]
+                                        break
+                                if not stock_name:
+                                    stock_name = "未知"
+                        
+                        # 格式3：更宽松的解析 - 只要包含6位数字就尝试提取
+                        if not stock_code and any(char.isdigit() for char in stock_info):
+                            import re
+                            # 查找所有6位数字
+                            codes = re.findall(r'\b\d{6}\b', stock_info)
+                            if codes:
+                                stock_code = codes[0]  # 使用第一个找到的代码
+                                stock_name = "未知"
+                                print(f"🔍 宽松模式找到股票代码: {stock_code}")
+                        
+                        # 如果找到了股票代码，创建股票数据
+                        if stock_code and stock_code.isdigit() and len(stock_code) == 6:
+                            stock_data = {
+                                "code": stock_code,
+                                "name": stock_name or "未知",
+                                "reason": reason,
+                                "risk": risk,
+                                "short_term_potential": potential,
+                                "holding_period": holding_period,
+                                "entry_strategy": entry_strategy,
+                                "exit_strategy": exit_strategy,
+                                "impact": "中"  # 默认值
+                            }
+                            
+                            if in_hot_stocks:
+                                stock_recommendations["hot_sector_stocks"].append(stock_data)
+                                print(f"✅ 添加热点板块股票: {stock_code} {stock_name}")
+                            elif in_rotation_stocks:
+                                stock_recommendations["rotation_stocks"].append(stock_data)
+                                print(f"✅ 添加轮动机会股票: {stock_code} {stock_name}")
+                        else:
+                            print(f"⚠️ 未找到有效的股票代码: {stock_info}")
+                            # 显示该行的详细信息用于调试
+                            print(f"   🔍 行内容: '{stock_info}'")
+                            print(f"   🔍 包含数字: {any(char.isdigit() for char in stock_info)}")
+                            if any(char.isdigit() for char in stock_info):
+                                import re
+                                numbers = re.findall(r'\d+', stock_info)
+                                print(f"   🔍 找到的数字: {numbers}")
+                            
                     except Exception as e:
                         print(f"⚠️ 解析股票信息失败: {stock_info}, 错误: {e}")
                         continue
