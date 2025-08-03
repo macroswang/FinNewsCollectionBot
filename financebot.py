@@ -1263,19 +1263,19 @@ def generate_detailed_short_term_report():
         indices = get_market_indices()
         
         # 获取新闻摘要
-        articles = fetch_rss_articles(rss_feeds, max_articles=15)
-        if not articles:
+        news_data, analysis_text = fetch_rss_articles(rss_feeds, max_articles=15)
+        if not analysis_text:
             print("❌ 无法获取新闻数据")
             return None
             
-        # 合并新闻内容
-        news_text = "\n".join([f"{article['title']}: {article['summary']}" for article in articles])
+        # 使用analysis_text作为新闻内容
+        news_text = analysis_text
         
         # 提取热点行业
-        industries = extract_industries_from_news(news_text)
+        industries, global_events = extract_industries_from_news(news_text)
         
         # 生成新闻摘要
-        news_summary = summarize(news_text)
+        news_summary = summarize(news_text, global_events)
         
         # 构建详细报告
         report = f"""
@@ -1291,7 +1291,7 @@ def generate_detailed_short_term_report():
         
         if indices:
             for index_name, index_data in indices.items():
-                report += f"**{index_name}**: ¥{index_data['current']} ({index_data['change']}%)\n"
+                report += f"**{index_name}**: {index_data}\n"
         
         report += f"""
 
