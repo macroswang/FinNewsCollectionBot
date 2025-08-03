@@ -638,78 +638,17 @@ def get_stock_industry(stock_code):
         if mapped_industry:
             return mapped_industry
         else:
-            # 如果无法获取，使用备用分类
-            return get_fallback_industry(stock_code)
+            # 如果无法获取，返回空字符串
+            return ""
             
     except Exception as e:
         print(f"⚠️ 获取{stock_code}行业分类失败: {e}")
-        return get_fallback_industry(stock_code)
+        return ""
 
-# 备用行业分类（当动态获取失败时使用）
+# 备用行业分类（已废弃）
 def get_fallback_industry(stock_code):
-    """基于股票代码的备用行业分类"""
-    # 基于股票代码的行业分类（部分知名股票）
-    stock_industry_map = {
-        # 新能源
-        "300750": "新能源",  # 宁德时代
-        "002594": "新能源",  # 比亚迪
-        "300274": "新能源",  # 阳光电源
-        "002129": "新能源",  # 中环股份
-        "601012": "新能源",  # 隆基绿能
-        
-        # 半导体
-        "688981": "半导体",  # 中芯国际
-        "002049": "半导体",  # 紫光国微
-        "688536": "半导体",  # 思瑞浦
-        "603986": "半导体",  # 兆易创新
-        "688012": "半导体",  # 中微公司
-        "688396": "半导体",  # 华润微
-        "688019": "半导体",  # 安集科技
-        
-        # 医药
-        "300015": "医药",    # 爱尔眼科
-        "600276": "医药",    # 恒瑞医药
-        "300760": "医药",    # 迈瑞医疗
-        "603259": "医药",    # 药明康德
-        "300122": "医药",    # 智飞生物
-        "002007": "医药",    # 华兰生物
-        
-        # 消费
-        "000858": "消费",    # 五粮液
-        "600519": "消费",    # 贵州茅台
-        "002304": "消费",    # 洋河股份
-        "000568": "消费",    # 泸州老窖
-        "600809": "消费",    # 山西汾酒
-        
-        # 科技
-        "000002": "房地产",  # 万科A
-        "000001": "银行",    # 平安银行
-        "600036": "银行",    # 招商银行
-        "002475": "科技",    # 立讯精密
-        "000725": "科技",    # 京东方A
-        "002415": "科技",    # 海康威视
-        
-        # 基建
-        "600900": "新能源",  # 长江电力 - 实际上是水电可再生能源
-        "601668": "基建",    # 中国建筑
-        "601390": "基建",    # 中国中铁
-        "601186": "基建",    # 中国铁建
-        "600068": "基建",    # 葛洲坝
-        
-        # 银行
-        "601398": "银行",    # 工商银行
-        "601939": "银行",    # 建设银行
-        "601988": "银行",    # 中国银行
-        "600000": "银行",    # 浦发银行
-        
-        # 化工
-        "600309": "化工",    # 万华化学
-        "002648": "化工",    # 卫星化学
-        "600426": "化工",    # 华鲁恒升
-        "002601": "化工",    # 龙佰集团
-    }
-    
-    return stock_industry_map.get(stock_code, "其他")
+    """基于股票代码的备用行业分类（已废弃，直接返回空字符串）"""
+    return ""
 
 # 验证股票是否属于指定行业
 def verify_stock_industry(stock_code, target_industry):
@@ -783,68 +722,26 @@ def get_specific_stock_recommendations(industry, news_summary):
             if verified_stocks:
                 return verified_stocks
             else:
-                print(f"⚠️ {industry}行业没有找到合适的股票，使用备用推荐")
-                return get_fallback_stocks_by_industry(industry)
+                print(f"⚠️ {industry}行业没有找到合适的股票")
+                return []
                 
         except json.JSONDecodeError:
-            print(f"⚠️ AI返回格式错误，使用备用推荐")
-            return get_fallback_stocks_by_industry(industry)
+            print(f"⚠️ AI返回格式错误")
+            return []
             
     except Exception as e:
         print(f"⚠️ 股票推荐失败: {e}")
-        return get_fallback_stocks_by_industry(industry)
+        return []
 
-# 按行业获取备用股票推荐
+# 按行业获取备用股票推荐（已废弃）
 def get_fallback_stocks_by_industry(industry):
-    """按行业获取备用股票推荐（仅限A股股票）"""
-    stock_templates = {
-        "新能源": [
-            {"code": "300750", "name": "宁德时代", "reason": "动力电池龙头，技术领先，短线关注业绩预期", "risk": "中", "impact": "高", "short_term_potential": "高", "holding_period": "3-5天", "entry_strategy": "回调买入，关注量能", "exit_strategy": "分批止盈，设置止损"},
-            {"code": "002594", "name": "比亚迪", "reason": "新能源汽车全产业链布局，政策利好", "risk": "中", "impact": "高", "short_term_potential": "高", "holding_period": "2-4天", "entry_strategy": "突破买入，关注技术形态", "exit_strategy": "快速止盈，控制风险"},
-            {"code": "300274", "name": "阳光电源", "reason": "光伏逆变器龙头，海外订单增长", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "1-3天", "entry_strategy": "低吸买入，关注支撑位", "exit_strategy": "及时止盈，避免追高"}
-        ],
-        "半导体": [
-            {"code": "688981", "name": "中芯国际", "reason": "国内晶圆代工龙头，国产替代加速", "risk": "高", "impact": "高", "short_term_potential": "高", "holding_period": "2-4天", "entry_strategy": "回调买入，关注政策面", "exit_strategy": "分批止盈，严格止损"},
-            {"code": "002049", "name": "紫光国微", "reason": "安全芯片设计领先，军工概念", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "1-3天", "entry_strategy": "突破买入，关注量能", "exit_strategy": "快速止盈，控制仓位"},
-            {"code": "688536", "name": "思瑞浦", "reason": "模拟芯片设计，技术壁垒高", "risk": "高", "impact": "中", "short_term_potential": "中", "holding_period": "1-2天", "entry_strategy": "低吸买入，关注技术面", "exit_strategy": "及时止盈，避免追高"}
-        ],
-        "医药": [
-            {"code": "300015", "name": "爱尔眼科", "reason": "眼科医疗服务龙头，消费医疗概念", "risk": "低", "impact": "中", "short_term_potential": "中", "holding_period": "2-4天", "entry_strategy": "回调买入，关注业绩", "exit_strategy": "分批止盈，长期持有"},
-            {"code": "600276", "name": "恒瑞医药", "reason": "创新药研发领先，政策支持", "risk": "中", "impact": "高", "short_term_potential": "高", "holding_period": "3-5天", "entry_strategy": "突破买入，关注研发进展", "exit_strategy": "分批止盈，设置止损"},
-            {"code": "300760", "name": "迈瑞医疗", "reason": "医疗器械龙头，海外市场拓展", "risk": "低", "impact": "中", "short_term_potential": "中", "holding_period": "2-3天", "entry_strategy": "低吸买入，关注订单", "exit_strategy": "及时止盈，控制风险"}
-        ],
-        "消费": [
-            {"code": "000858", "name": "五粮液", "reason": "白酒龙头，品牌价值高，消费复苏", "risk": "低", "impact": "中", "short_term_potential": "中", "holding_period": "2-4天", "entry_strategy": "回调买入，关注销量", "exit_strategy": "分批止盈，长期持有"},
-            {"code": "600519", "name": "贵州茅台", "reason": "白酒第一品牌，稀缺性价值", "risk": "低", "impact": "中", "short_term_potential": "中", "holding_period": "3-5天", "entry_strategy": "低吸买入，关注价格", "exit_strategy": "分批止盈，价值投资"},
-            {"code": "002304", "name": "洋河股份", "reason": "白酒行业领先，渠道优势明显", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "1-3天", "entry_strategy": "突破买入，关注业绩", "exit_strategy": "快速止盈，控制风险"}
-        ],
-        "科技": [
-            {"code": "002475", "name": "立讯精密", "reason": "消费电子制造龙头，苹果概念", "risk": "中", "impact": "高", "short_term_potential": "高", "holding_period": "2-4天", "entry_strategy": "回调买入，关注订单", "exit_strategy": "分批止盈，设置止损"},
-            {"code": "000725", "name": "京东方A", "reason": "显示面板龙头，OLED技术突破", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "1-3天", "entry_strategy": "低吸买入，关注技术", "exit_strategy": "及时止盈，避免追高"},
-            {"code": "002415", "name": "海康威视", "reason": "安防设备龙头，AI技术领先", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "2-3天", "entry_strategy": "突破买入，关注创新", "exit_strategy": "分批止盈，控制风险"}
-        ],
-        "基建": [
-            {"code": "601668", "name": "中国建筑", "reason": "建筑行业龙头，基建投资加码", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "2-4天", "entry_strategy": "回调买入，关注订单", "exit_strategy": "分批止盈，设置止损"},
-            {"code": "601390", "name": "中国中铁", "reason": "铁路建设龙头，政策支持", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "1-3天", "entry_strategy": "低吸买入，关注项目", "exit_strategy": "及时止盈，控制风险"},
-            {"code": "601186", "name": "中国铁建", "reason": "基建工程龙头，海外市场拓展", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "2-3天", "entry_strategy": "突破买入，关注合同", "exit_strategy": "分批止盈，避免追高"}
-        ],
-        "银行": [
-            {"code": "000001", "name": "平安银行", "reason": "零售银行领先，数字化转型", "risk": "低", "impact": "中", "short_term_potential": "中", "holding_period": "2-4天", "entry_strategy": "回调买入，关注业绩", "exit_strategy": "分批止盈，长期持有"},
-            {"code": "600036", "name": "招商银行", "reason": "零售银行龙头，资产质量优良", "risk": "低", "impact": "中", "short_term_potential": "中", "holding_period": "3-5天", "entry_strategy": "低吸买入，关注分红", "exit_strategy": "分批止盈，价值投资"},
-            {"code": "601398", "name": "工商银行", "reason": "国有大行龙头，稳定性强", "risk": "低", "impact": "中", "short_term_potential": "低", "holding_period": "3-5天", "entry_strategy": "低吸买入，关注股息", "exit_strategy": "长期持有，稳健投资"}
-        ],
-        "化工": [
-            {"code": "600309", "name": "万华化学", "reason": "化工龙头，MDI全球领先", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "2-4天", "entry_strategy": "回调买入，关注价格", "exit_strategy": "分批止盈，设置止损"},
-            {"code": "002648", "name": "卫星化学", "reason": "石化新材料龙头，技术领先", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "1-3天", "entry_strategy": "突破买入，关注产能", "exit_strategy": "及时止盈，控制风险"},
-            {"code": "600426", "name": "华鲁恒升", "reason": "煤化工龙头，成本优势明显", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "2-3天", "entry_strategy": "低吸买入，关注成本", "exit_strategy": "分批止盈，避免追高"}
-        ]
-    }
-    return stock_templates.get(industry, [])
+    """按行业获取备用股票推荐（已废弃，直接返回空列表）"""
+    return []
 
 # 生成股票推荐模板（保持向后兼容）
 def generate_stock_recommendations(industry):
-    """基于行业生成股票推荐模板（已废弃，使用get_specific_stock_recommendations）"""
-    return get_fallback_stocks_by_industry(industry)
+    """基于行业生成股票推荐模板（已废弃，直接返回空列表）"""
+    return []
 
 # 新增：从AI摘要中提取股票推荐信息
 def extract_stock_recommendations_from_summary(summary):
@@ -1086,33 +983,6 @@ def send_to_wechat(title, content):
         else:
             print(f"❌ 推送失败: {key}, 响应：{response.text}")
 
-# 测试股票行业分类功能
-def test_stock_industry_classification():
-    """测试股票行业分类功能"""
-    print("🧪 开始测试股票行业分类功能...")
-    
-    test_stocks = [
-        ("300750", "宁德时代", "新能源"),
-        ("002594", "比亚迪", "新能源"),
-        ("688981", "中芯国际", "半导体"),
-        ("603986", "兆易创新", "半导体"),
-        ("300015", "爱尔眼科", "医药"),
-        ("603259", "药明康德", "医药"),
-        ("000858", "五粮液", "消费"),
-        ("600519", "贵州茅台", "消费"),
-        ("002475", "立讯精密", "科技"),
-        ("600900", "长江电力", "新能源"),
-        ("000001", "平安银行", "银行"),
-        ("600309", "万华化学", "化工")
-    ]
-    
-    for code, name, expected_industry in test_stocks:
-        actual_industry = get_stock_industry(code)
-        status = "✅" if actual_industry == expected_industry else "❌"
-        print(f"{status} {code} {name}: 期望{expected_industry}, 实际{actual_industry}")
-    
-    print("🧪 股票行业分类测试完成\n")
-
 # 散户短线交易快速分析
 def quick_short_term_analysis():
     """为散户提供短线交易快速分析"""
@@ -1239,27 +1109,10 @@ if __name__ == "__main__":
     # 使用从AI摘要中提取的股票推荐
     print(f"🔍 检查股票推荐条件: hot_sector_stocks={bool(extracted_stocks['hot_sector_stocks'])}, rotation_stocks={bool(extracted_stocks['rotation_stocks'])}")
     
-    # 如果没有从AI摘要中提取到股票，使用备用机制
+    # 如果没有从AI摘要中提取到股票，跳过备用机制
     if not extracted_stocks["hot_sector_stocks"] and not extracted_stocks["rotation_stocks"]:
-        print("⚠️ 未从AI摘要中提取到股票推荐，使用备用机制")
-        # 根据检测到的行业生成备用股票推荐
-        if related_industries:
-            # 选择前3个主要行业
-            main_industries = related_industries[:3]
-            print(f"🔍 使用备用行业生成股票推荐: {main_industries}")
-            
-            # 为热点板块和轮动机会分别生成股票
-            for i, industry in enumerate(main_industries):
-                if i < 2:  # 前2个行业作为热点板块
-                    fallback_stocks = get_fallback_stocks_by_industry(industry)
-                    if fallback_stocks:
-                        extracted_stocks["hot_sector_stocks"].extend(fallback_stocks[:2])  # 每个行业最多2只股票
-                        print(f"✅ 为热点板块添加{industry}行业股票: {len(fallback_stocks[:2])}只")
-                else:  # 第3个行业作为轮动机会
-                    fallback_stocks = get_fallback_stocks_by_industry(industry)
-                    if fallback_stocks:
-                        extracted_stocks["rotation_stocks"].extend(fallback_stocks[:2])  # 每个行业最多2只股票
-                        print(f"✅ 为轮动机会添加{industry}行业股票: {len(fallback_stocks[:2])}只")
+        print("⚠️ 未从AI摘要中提取到股票推荐，跳过备用机制")
+        # 备用机制已废弃，不再生成备用股票推荐
     
     if extracted_stocks["hot_sector_stocks"] or extracted_stocks["rotation_stocks"]:
         stock_recommendations = "## 🎯 A股投资机会（仅限A股股票）\n\n"
