@@ -199,6 +199,18 @@ def summarize(text, global_events=None):
                  - 买入时机：具体建议
                  - 止盈止损：价格区间
                  
+                 ## 🎯 具体股票推荐
+                 
+                 ### 📈 热点板块股票
+                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 
+                 ### 🔄 轮动机会股票
+                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 
                  ## ⚠️ 风险提示
                  - 短期利空因素
                  - 需要规避的板块
@@ -219,6 +231,8 @@ def summarize(text, global_events=None):
                  - 提供具体的价格区间和操作建议
                  - 强调风险控制和资金管理
                  - 避免过度乐观，保持理性分析
+                 - 推荐股票要结合新闻热点，优先选择中小盘股票（市值100-500亿）
+                 - 避免推荐超大市值股票（如茅台、宁德时代等）
                  """},
                 {"role": "user", "content": f"新闻内容：{text}\n\n{global_context}"}
             ]
@@ -682,6 +696,92 @@ def generate_stock_recommendations(industry):
     """基于行业生成股票推荐模板（已废弃，使用get_specific_stock_recommendations）"""
     return get_fallback_stocks_by_industry(industry)
 
+# 新增：从AI摘要中提取股票推荐信息
+def extract_stock_recommendations_from_summary(summary):
+    """从AI摘要中提取股票推荐信息"""
+    stock_recommendations = {
+        "hot_sector_stocks": [],  # 热点板块股票
+        "rotation_stocks": []     # 轮动机会股票
+    }
+    
+    try:
+        if "具体股票推荐" in summary or "热点板块股票" in summary:
+            lines = summary.split('\n')
+            in_hot_stocks = False
+            in_rotation_stocks = False
+            
+            for line in lines:
+                line = line.strip()
+                
+                # 热点板块股票
+                if "热点板块股票" in line or "📈" in line:
+                    in_hot_stocks = True
+                    in_rotation_stocks = False
+                    continue
+                
+                # 轮动机会股票
+                elif "轮动机会股票" in line or "🔄" in line:
+                    in_hot_stocks = False
+                    in_rotation_stocks = True
+                    continue
+                
+                # 遇到新的标题，停止当前提取
+                elif line.startswith('##') or line.startswith('###'):
+                    in_hot_stocks = False
+                    in_rotation_stocks = False
+                    continue
+                
+                # 提取股票信息
+                if (in_hot_stocks or in_rotation_stocks) and line.startswith('-') and len(line) > 2:
+                    stock_info = line[1:].strip()
+                    
+                    # 解析股票信息
+                    try:
+                        # 格式：股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                        if '：' in stock_info:
+                            stock_part, details_part = stock_info.split('：', 1)
+                            
+                            # 提取股票代码和名称
+                            parts = stock_part.strip().split()
+                            if len(parts) >= 2:
+                                stock_code = parts[0]
+                                stock_name = parts[1]
+                                
+                                # 解析详细信息
+                                details = details_part.split('，')
+                                if len(details) >= 6:
+                                    reason = details[0]
+                                    risk = details[1]
+                                    potential = details[2]
+                                    holding_period = details[3]
+                                    entry_strategy = details[4]
+                                    exit_strategy = details[5]
+                                    
+                                    stock_data = {
+                                        "code": stock_code,
+                                        "name": stock_name,
+                                        "reason": reason,
+                                        "risk": risk,
+                                        "short_term_potential": potential,
+                                        "holding_period": holding_period,
+                                        "entry_strategy": entry_strategy,
+                                        "exit_strategy": exit_strategy,
+                                        "impact": "中"  # 默认值
+                                    }
+                                    
+                                    if in_hot_stocks:
+                                        stock_recommendations["hot_sector_stocks"].append(stock_data)
+                                    elif in_rotation_stocks:
+                                        stock_recommendations["rotation_stocks"].append(stock_data)
+                    except Exception as e:
+                        print(f"⚠️ 解析股票信息失败: {stock_info}, 错误: {e}")
+                        continue
+                        
+    except Exception as e:
+        print(f"⚠️ 提取股票推荐失败: {e}")
+    
+    return stock_recommendations
+
 # 全球事件联动分析系统
 def analyze_global_market_linkage(news_text):
     """分析全球市场联动关系"""
@@ -935,6 +1035,9 @@ if __name__ == "__main__":
     
     # AI生成摘要（包含全球联动分析）
     summary = summarize(analysis_text, global_events)
+    
+    # 从AI摘要中提取股票推荐信息
+    extracted_stocks = extract_stock_recommendations_from_summary(summary)
 
     # 生成市场情绪和时机分析部分
     sentiment_section = "## 📊 市场情绪概览\n"
@@ -967,108 +1070,177 @@ if __name__ == "__main__":
 
     # 生成股票推荐部分
     stock_recommendations = ""
-    if related_industries:
-        stock_recommendations = "## 🎯 A股投资机会\n\n"
-        for industry in related_industries[:3]:  # 最多推荐3个行业
-            print(f"🤖 正在为{industry}行业生成股票推荐...")
-            stocks = get_specific_stock_recommendations(industry, summary)
-            if stocks:
-                stock_recommendations += f"### 📈 {industry}板块\n"
-                for stock in stocks[:3]:  # 每个行业最多3只股票
-                    # 再次验证股票行业分类
-                    if not verify_stock_industry(stock["code"], industry):
-                        actual_industry = get_stock_industry(stock["code"])
-                        print(f"⚠️ 跳过{stock['code']} {stock['name']}，实际为{actual_industry}行业，不属于{industry}行业")
-                        continue
-                        
-                    risk_emoji = {"低": "🟢", "中": "🟡", "高": "🔴"}.get(stock["risk"], "⚪")
-                    impact_emoji = {"高": "🔥", "中": "⚡", "低": "💡"}.get(stock.get("impact", "中"), "💡")
-                    potential_emoji = {"高": "🚀", "中": "📈", "低": "📊"}.get(stock.get("short_term_potential", "中"), "📊")
-                    stock_recommendations += f"- **{stock['code']} {stock['name']}** {risk_emoji} {impact_emoji} {potential_emoji}\n"
-                    stock_recommendations += f"  - 推荐理由: {stock['reason']}\n"
-                    stock_recommendations += f"  - 风险等级: {stock['risk']}\n"
-                    if stock.get("impact"):
-                        stock_recommendations += f"  - 影响程度: {stock['impact']}\n"
-                    if stock.get("short_term_potential"):
-                        stock_recommendations += f"  - 短线潜力: {stock['short_term_potential']}\n"
-                    if stock.get("holding_period"):
-                        stock_recommendations += f"  - 建议持仓: {stock['holding_period']}\n"
-                    if stock.get("entry_strategy"):
-                        stock_recommendations += f"  - 买入策略: {stock['entry_strategy']}\n"
-                    if stock.get("exit_strategy"):
-                        stock_recommendations += f"  - 卖出策略: {stock['exit_strategy']}\n"
+    
+    # 使用从AI摘要中提取的股票推荐
+    if extracted_stocks["hot_sector_stocks"] or extracted_stocks["rotation_stocks"]:
+        stock_recommendations = "## 🎯 A股投资机会（来自短线交易机会）\n\n"
+        
+        # 显示热点板块股票
+        if extracted_stocks["hot_sector_stocks"]:
+            stock_recommendations += "### 📈 热点板块股票\n"
+            for stock in extracted_stocks["hot_sector_stocks"][:3]:  # 最多显示3只
+                # 验证股票行业分类（如果可能）
+                try:
+                    stock_industry = get_stock_industry(stock["code"])
+                    print(f"✅ {stock['code']} {stock['name']} 属于{stock_industry}行业")
+                except:
+                    print(f"⚠️ 无法验证{stock['code']} {stock['name']}的行业分类")
+                
+                risk_emoji = {"低": "🟢", "中": "🟡", "高": "🔴"}.get(stock["risk"], "⚪")
+                impact_emoji = {"高": "🔥", "中": "⚡", "低": "💡"}.get(stock.get("impact", "中"), "💡")
+                potential_emoji = {"高": "🚀", "中": "📈", "低": "📊"}.get(stock.get("short_term_potential", "中"), "📊")
+                stock_recommendations += f"- **{stock['code']} {stock['name']}** {risk_emoji} {impact_emoji} {potential_emoji}\n"
+                stock_recommendations += f"  - 推荐理由: {stock['reason']}\n"
+                stock_recommendations += f"  - 风险等级: {stock['risk']}\n"
+                stock_recommendations += f"  - 短线潜力: {stock['short_term_potential']}\n"
+                stock_recommendations += f"  - 建议持仓: {stock['holding_period']}\n"
+                stock_recommendations += f"  - 买入策略: {stock['entry_strategy']}\n"
+                stock_recommendations += f"  - 卖出策略: {stock['exit_strategy']}\n"
+                
+                # 获取实时数据
+                try:
+                    print(f"📊 正在获取{stock['code']}的实时数据...")
+                    real_time_data = get_real_time_stock_data(stock['code'])
                     
-                    # 获取实时数据
-                    try:
-                        print(f"📊 正在获取{stock['code']}的实时数据...")
-                        real_time_data = get_real_time_stock_data(stock['code'])
+                    if real_time_data:
+                        # 实时价格和涨跌幅
+                        price_change_emoji = "📈" if real_time_data["price_change"] > 0 else "📉" if real_time_data["price_change"] < 0 else "➡️"
+                        stock_recommendations += f"  - **实时价格**: ¥{real_time_data['current_price']} {price_change_emoji} {real_time_data['price_change']}%\n"
                         
-                        if real_time_data:
-                            # 实时价格和涨跌幅
-                            price_change_emoji = "📈" if real_time_data["price_change"] > 0 else "📉" if real_time_data["price_change"] < 0 else "➡️"
-                            stock_recommendations += f"  - **实时价格**: ¥{real_time_data['current_price']} {price_change_emoji} {real_time_data['price_change']}%\n"
-                            
-                            # 基本面数据
-                            if real_time_data["pe_ratio"] != 'N/A' and real_time_data["pe_ratio"] is not None:
-                                pe_str = f"{real_time_data['pe_ratio']:.1f}" if isinstance(real_time_data['pe_ratio'], (int, float)) else str(real_time_data['pe_ratio'])
-                                pb_str = f"{real_time_data['pb_ratio']:.2f}" if real_time_data['pb_ratio'] != 'N/A' and real_time_data['pb_ratio'] is not None and isinstance(real_time_data['pb_ratio'], (int, float)) else 'N/A'
-                                stock_recommendations += f"  - **估值**: PE{pe_str} | PB{pb_str}\n"
-                            
-                            # 技术面分析
-                            trend = "上涨" if real_time_data["current_price"] > real_time_data["ma20"] else "下跌" if real_time_data["current_price"] < real_time_data["ma20"] else "震荡"
-                            stock_recommendations += f"  - **技术面**: {trend} | MA20:¥{real_time_data['ma20']:.2f} | MA50:¥{real_time_data['ma50']:.2f}\n"
-                            
-                            # 支撑阻力位
-                            stock_recommendations += f"  - **支撑/阻力**: ¥{real_time_data['recent_low']:.2f} / ¥{real_time_data['recent_high']:.2f}\n"
-                            
-                            # 成交量分析
-                            volume_emoji = "🔥" if real_time_data["volume_ratio"] > 1.5 else "📊" if real_time_data["volume_ratio"] > 1 else "📉"
-                            stock_recommendations += f"  - **成交量**: {volume_emoji} {real_time_data['volume_ratio']:.1f}倍\n"
-                            
-                            # 交易建议（基于实时数据，符合用户止盈止损要求）
-                            entry_price = real_time_data["current_price"] * 0.97  # 建议在现价3%以下买入
-                            stop_loss = real_time_data["current_price"] * 0.97    # 止损设在现价3%以下（符合用户≤-3%要求）
-                            target_price = real_time_data["current_price"] * 1.10  # 目标价设在现价10%以上（符合用户≤10%要求）
-                            
-                            stock_recommendations += f"  - **买入建议**: ¥{entry_price:.2f}以下（回调买入）\n"
-                            stock_recommendations += f"  - **止损位**: ¥{stop_loss:.2f}（≤-3%）\n"
-                            stock_recommendations += f"  - **目标价**: ¥{target_price:.2f}（≤10%）\n"
-                            stock_recommendations += f"  - **操作策略**: 快进快出，1-5个交易日\n"
-                        else:
-                            stock_recommendations += f"  - **数据获取失败**，请手动查询\n"
-                    except Exception as e:
-                        print(f"⚠️ 处理{stock['code']}数据时出错: {e}")
-                        stock_recommendations += f"  - **数据处理错误**，请手动查询\n"
+                        # 基本面数据
+                        if real_time_data["pe_ratio"] != 'N/A' and real_time_data["pe_ratio"] is not None:
+                            pe_str = f"{real_time_data['pe_ratio']:.1f}" if isinstance(real_time_data['pe_ratio'], (int, float)) else str(real_time_data['pe_ratio'])
+                            pb_str = f"{real_time_data['pb_ratio']:.2f}" if real_time_data["pb_ratio"] != 'N/A' and real_time_data["pb_ratio"] is not None and isinstance(real_time_data['pb_ratio'], (int, float)) else 'N/A'
+                            stock_recommendations += f"  - **估值**: PE{pe_str} | PB{pb_str}\n"
+                        
+                        # 技术面分析
+                        trend = "上涨" if real_time_data["current_price"] > real_time_data["ma20"] else "下跌" if real_time_data["current_price"] < real_time_data["ma20"] else "震荡"
+                        stock_recommendations += f"  - **技术面**: {trend} | MA20:¥{real_time_data['ma20']:.2f} | MA50:¥{real_time_data['ma50']:.2f}\n"
+                        
+                        # 支撑阻力位
+                        stock_recommendations += f"  - **支撑/阻力**: ¥{real_time_data['recent_low']:.2f} / ¥{real_time_data['recent_high']:.2f}\n"
+                        
+                        # 成交量分析
+                        volume_emoji = "🔥" if real_time_data["volume_ratio"] > 1.5 else "📊" if real_time_data["volume_ratio"] > 1 else "📉"
+                        stock_recommendations += f"  - **成交量**: {volume_emoji} {real_time_data['volume_ratio']:.1f}倍\n"
+                        
+                        # 交易建议（基于实时数据，符合用户止盈止损要求）
+                        entry_price = real_time_data["current_price"] * 0.97  # 建议在现价3%以下买入
+                        stop_loss = real_time_data["current_price"] * 0.97    # 止损设在现价3%以下（符合用户≤-3%要求）
+                        target_price = real_time_data["current_price"] * 1.10  # 目标价设在现价10%以上（符合用户≤10%要求）
+                        
+                        stock_recommendations += f"  - **买入建议**: ¥{entry_price:.2f}以下（回调买入）\n"
+                        stock_recommendations += f"  - **止损位**: ¥{stop_loss:.2f}（≤-3%）\n"
+                        stock_recommendations += f"  - **目标价**: ¥{target_price:.2f}（≤10%）\n"
+                        stock_recommendations += f"  - **操作策略**: 快进快出，1-5个交易日\n"
+                    else:
+                        stock_recommendations += f"  - **数据获取失败**，请手动查询\n"
+                except Exception as e:
+                    print(f"⚠️ 处理{stock['code']}数据时出错: {e}")
+                    stock_recommendations += f"  - **数据处理错误**，请手动查询\n"
+                
+                stock_recommendations += "\n"
+        
+        # 显示轮动机会股票
+        if extracted_stocks["rotation_stocks"]:
+            stock_recommendations += "### 🔄 轮动机会股票\n"
+            for stock in extracted_stocks["rotation_stocks"][:3]:  # 最多显示3只
+                # 验证股票行业分类（如果可能）
+                try:
+                    stock_industry = get_stock_industry(stock["code"])
+                    print(f"✅ {stock['code']} {stock['name']} 属于{stock_industry}行业")
+                except:
+                    print(f"⚠️ 无法验证{stock['code']} {stock['name']}的行业分类")
+                
+                risk_emoji = {"低": "🟢", "中": "🟡", "高": "🔴"}.get(stock["risk"], "⚪")
+                impact_emoji = {"高": "🔥", "中": "⚡", "低": "💡"}.get(stock.get("impact", "中"), "💡")
+                potential_emoji = {"高": "🚀", "中": "📈", "低": "📊"}.get(stock.get("short_term_potential", "中"), "📊")
+                stock_recommendations += f"- **{stock['code']} {stock['name']}** {risk_emoji} {impact_emoji} {potential_emoji}\n"
+                stock_recommendations += f"  - 推荐理由: {stock['reason']}\n"
+                stock_recommendations += f"  - 风险等级: {stock['risk']}\n"
+                stock_recommendations += f"  - 短线潜力: {stock['short_term_potential']}\n"
+                stock_recommendations += f"  - 建议持仓: {stock['holding_period']}\n"
+                stock_recommendations += f"  - 买入策略: {stock['entry_strategy']}\n"
+                stock_recommendations += f"  - 卖出策略: {stock['exit_strategy']}\n"
+                
+                # 获取实时数据
+                try:
+                    print(f"📊 正在获取{stock['code']}的实时数据...")
+                    real_time_data = get_real_time_stock_data(stock['code'])
                     
-                    stock_recommendations += "\n"
-        stock_recommendations += "⚠️ **投资提醒**: 以上推荐基于今日新闻动态生成，仅供参考，投资有风险，入市需谨慎！\n\n"
+                    if real_time_data:
+                        # 实时价格和涨跌幅
+                        price_change_emoji = "📈" if real_time_data["price_change"] > 0 else "📉" if real_time_data["price_change"] < 0 else "➡️"
+                        stock_recommendations += f"  - **实时价格**: ¥{real_time_data['current_price']} {price_change_emoji} {real_time_data['price_change']}%\n"
+                        
+                        # 基本面数据
+                        if real_time_data["pe_ratio"] != 'N/A' and real_time_data["pe_ratio"] is not None:
+                            pe_str = f"{real_time_data['pe_ratio']:.1f}" if isinstance(real_time_data['pe_ratio'], (int, float)) else str(real_time_data['pe_ratio'])
+                            pb_str = f"{real_time_data['pb_ratio']:.2f}" if real_time_data["pb_ratio"] != 'N/A' and real_time_data["pb_ratio"] is not None and isinstance(real_time_data['pb_ratio'], (int, float)) else 'N/A'
+                            stock_recommendations += f"  - **估值**: PE{pe_str} | PB{pb_str}\n"
+                        
+                        # 技术面分析
+                        trend = "上涨" if real_time_data["current_price"] > real_time_data["ma20"] else "下跌" if real_time_data["current_price"] < real_time_data["ma20"] else "震荡"
+                        stock_recommendations += f"  - **技术面**: {trend} | MA20:¥{real_time_data['ma20']:.2f} | MA50:¥{real_time_data['ma50']:.2f}\n"
+                        
+                        # 支撑阻力位
+                        stock_recommendations += f"  - **支撑/阻力**: ¥{real_time_data['recent_low']:.2f} / ¥{real_time_data['recent_high']:.2f}\n"
+                        
+                        # 成交量分析
+                        volume_emoji = "🔥" if real_time_data["volume_ratio"] > 1.5 else "📊" if real_time_data["volume_ratio"] > 1 else "📉"
+                        stock_recommendations += f"  - **成交量**: {volume_emoji} {real_time_data['volume_ratio']:.1f}倍\n"
+                        
+                        # 交易建议（基于实时数据，符合用户止盈止损要求）
+                        entry_price = real_time_data["current_price"] * 0.97  # 建议在现价3%以下买入
+                        stop_loss = real_time_data["current_price"] * 0.97    # 止损设在现价3%以下（符合用户≤-3%要求）
+                        target_price = real_time_data["current_price"] * 1.10  # 目标价设在现价10%以上（符合用户≤10%要求）
+                        
+                        stock_recommendations += f"  - **买入建议**: ¥{entry_price:.2f}以下（回调买入）\n"
+                        stock_recommendations += f"  - **止损位**: ¥{stop_loss:.2f}（≤-3%）\n"
+                        stock_recommendations += f"  - **目标价**: ¥{target_price:.2f}（≤10%）\n"
+                        stock_recommendations += f"  - **操作策略**: 快进快出，1-5个交易日\n"
+                    else:
+                        stock_recommendations += f"  - **数据获取失败**，请手动查询\n"
+                except Exception as e:
+                    print(f"⚠️ 处理{stock['code']}数据时出错: {e}")
+                    stock_recommendations += f"  - **数据处理错误**，请手动查询\n"
+                
+                stock_recommendations += "\n"
         
-        # 添加短线交易策略建议
-        strategy_section = "## 💡 散户短线交易策略\n\n"
-        strategy_section += "### 📈 建仓策略\n"
-        strategy_section += "- **分批建仓**: 建议分2-3次建仓，降低单次风险\n"
-        strategy_section += "- **仓位控制**: 单只股票不超过总仓位的5-8%（资金量有限）\n"
-        strategy_section += "- **时机把握**: 关注回调机会，避免追高\n"
-        strategy_section += "- **快进快出**: 1-5个交易日完成交易\n\n"
+        # 如果没有提取到股票，不显示A股投资机会部分
+        if not extracted_stocks["hot_sector_stocks"] and not extracted_stocks["rotation_stocks"]:
+            print("⚠️ 未从AI摘要中提取到股票推荐，跳过A股投资机会部分")
+            stock_recommendations = ""
+        if stock_recommendations:
+            stock_recommendations += "⚠️ **投资提醒**: 以上推荐基于今日新闻动态生成，仅供参考，投资有风险，入市需谨慎！\n\n"
         
-        strategy_section += "### 🛡️ 风险控制\n"
-        strategy_section += "- **止损设置**: 严格执行止损，不超过-3%\n"
-        strategy_section += "- **止盈策略**: 分批止盈，目标≤10%\n"
-        strategy_section += "- **分散投资**: 避免过度集中在单一行业\n"
-        strategy_section += "- **资金管理**: 预留30%资金应对机会\n\n"
-        
-        strategy_section += "### 📊 短线操作要点\n"
-        strategy_section += "- **每日检视**: 每个交易日评估持仓表现\n"
-        strategy_section += "- **及时止盈**: 达到目标及时卖出，不贪心\n"
-        strategy_section += "- **严格止损**: 触及止损位立即卖出\n"
-        strategy_section += "- **关注量能**: 成交量是短线交易的重要指标\n\n"
-        
-        strategy_section += "### 🎯 散户优势发挥\n"
-        strategy_section += "- **灵活操作**: 资金量小，进出灵活\n"
-        strategy_section += "- **快速反应**: 及时捕捉市场机会\n"
-        strategy_section += "- **风险可控**: 单笔损失有限，心理压力小\n\n"
-        
-        stock_recommendations += strategy_section
+        # 添加短线交易策略建议（仅在有股票推荐时显示）
+        if stock_recommendations:
+            strategy_section = "## 💡 散户短线交易策略\n\n"
+            strategy_section += "### 📈 建仓策略\n"
+            strategy_section += "- **分批建仓**: 建议分2-3次建仓，降低单次风险\n"
+            strategy_section += "- **仓位控制**: 单只股票不超过总仓位的5-8%（资金量有限）\n"
+            strategy_section += "- **时机把握**: 关注回调机会，避免追高\n"
+            strategy_section += "- **快进快出**: 1-5个交易日完成交易\n\n"
+            
+            strategy_section += "### 🛡️ 风险控制\n"
+            strategy_section += "- **止损设置**: 严格执行止损，不超过-3%\n"
+            strategy_section += "- **止盈策略**: 分批止盈，目标≤10%\n"
+            strategy_section += "- **分散投资**: 避免过度集中在单一行业\n"
+            strategy_section += "- **资金管理**: 预留30%资金应对机会\n\n"
+            
+            strategy_section += "### 📊 短线操作要点\n"
+            strategy_section += "- **每日检视**: 每个交易日评估持仓表现\n"
+            strategy_section += "- **及时止盈**: 达到目标及时卖出，不贪心\n"
+            strategy_section += "- **严格止损**: 触及止损位立即卖出\n"
+            strategy_section += "- **关注量能**: 成交量是短线交易的重要指标\n\n"
+            
+            strategy_section += "### 🎯 散户优势发挥\n"
+            strategy_section += "- **灵活操作**: 资金量小，进出灵活\n"
+            strategy_section += "- **快速反应**: 及时捕捉市场机会\n"
+            strategy_section += "- **风险可控**: 单笔损失有限，心理压力小\n\n"
+            
+            stock_recommendations += strategy_section
 
     # 生成散户短线交易专用分析
     retail_analysis = generate_retail_short_term_summary()
