@@ -827,8 +827,18 @@ def extract_stock_recommendations_from_summary(summary):
                         entry_strategy = "回调买入"
                         exit_strategy = "分批止盈"
                         
-                        # 格式1：股票代码 股票名称: 详细信息
-                        if ':' in stock_info or '：' in stock_info:
+                        # 格式1：处理 **股票代码 股票名称** 格式
+                        if '**' in stock_info and ('股票代码' in stock_info or any(char.isdigit() for char in stock_info)):
+                            import re
+                            # 查找 **股票代码 股票名称** 格式
+                            bold_match = re.search(r'\*\*(\d{6})\s+([^*]+)\*\*', stock_info)
+                            if bold_match:
+                                stock_code = bold_match.group(1)
+                                stock_name = bold_match.group(2).strip()
+                                print(f"🔍 从粗体格式提取: {stock_code} {stock_name}")
+                        
+                        # 格式2：股票代码 股票名称: 详细信息
+                        elif ':' in stock_info or '：' in stock_info:
                             separator = ':' if ':' in stock_info else '：'
                             stock_part, details_part = stock_info.split(separator, 1)
                             
@@ -871,11 +881,48 @@ def extract_stock_recommendations_from_summary(summary):
                             codes = re.findall(r'\b\d{6}\b', stock_info)
                             if codes:
                                 stock_code = codes[0]  # 使用第一个找到的代码
-                                stock_name = "未知"
-                                print(f"🔍 宽松模式找到股票代码: {stock_code}")
+                                # 尝试从粗体格式中提取股票名称
+                                bold_name_match = re.search(r'\*\*(\d{6})\s+([^*]+)\*\*', stock_info)
+                                if bold_name_match:
+                                    stock_name = bold_name_match.group(2).strip()
+                                else:
+                                    stock_name = "未知"
+                                print(f"🔍 宽松模式找到股票代码: {stock_code} {stock_name}")
                         
                         # 如果找到了股票代码，创建股票数据
                         if stock_code and stock_code.isdigit() and len(stock_code) == 6:
+                            # 尝试从原始文本中提取更多信息
+                            if '：' in stock_info:
+                                details_part = stock_info.split('：', 1)[1]
+                                # 尝试提取推荐理由（冒号后的第一句话）
+                                sentences = details_part.split('。')
+                                if sentences:
+                                    reason = sentences[0].strip()
+                                
+                                # 尝试提取风险等级
+                                if '风险等级' in details_part:
+                                    risk_match = re.search(r'风险等级([低中高])', details_part)
+                                    if risk_match:
+                                        risk = risk_match.group(1)
+                                
+                                # 尝试提取持仓时间
+                                if '持仓' in details_part:
+                                    holding_match = re.search(r'持仓(\d+天)', details_part)
+                                    if holding_match:
+                                        holding_period = holding_match.group(1)
+                                
+                                # 尝试提取买入策略
+                                if '买入' in details_part:
+                                    entry_match = re.search(r'([^，。]+买入[^，。]*)', details_part)
+                                    if entry_match:
+                                        entry_strategy = entry_match.group(1).strip()
+                                
+                                # 尝试提取止盈止损
+                                if '止盈' in details_part or '止损' in details_part:
+                                    exit_match = re.search(r'([^，。]*(?:止盈|止损)[^，。]*)', details_part)
+                                    if exit_match:
+                                        exit_strategy = exit_match.group(1).strip()
+                            
                             stock_data = {
                                 "code": stock_code,
                                 "name": stock_name or "未知",
