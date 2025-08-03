@@ -202,14 +202,14 @@ def summarize(text, global_events=None):
                  ## 🎯 具体股票推荐（仅限A股）
                  
                  ### 📈 热点板块股票（A股）
-                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
-                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
-                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略，技术面支撑位/阻力位，最新股价
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略，技术面支撑位/阻力位，最新股价
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略，技术面支撑位/阻力位，最新股价
                  
                  ### 🔄 轮动机会股票（A股）
-                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
-                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
-                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略，技术面支撑位/阻力位，最新股价
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略，技术面支撑位/阻力位，最新股价
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略，技术面支撑位/阻力位，最新股价
                  
                  ## ⚠️ 风险提示
                  - 短期利空因素
@@ -239,6 +239,8 @@ def summarize(text, global_events=None):
                  - **重要：只推荐A股股票，不要推荐港股、美股或其他海外股票**
                  - 股票代码格式：6位数字（如000001、600000、300001等）
                  - **关键要求：具体股票推荐必须从热点板块和轮动机会中通过AI分析总结后产生，确保推荐的股票与新闻热点和板块轮动逻辑直接相关**
+                 - **技术面分析要求：为每只推荐的股票提供技术面支撑位/阻力位分析，包括近期低点、高点、关键均线位置等**
+                 - **股价信息要求：提供最新股价信息，包括当前价格、涨跌幅、成交量等关键数据**
                  """},
                 {"role": "user", "content": f"新闻内容：{text}\n\n{global_context}"}
             ]
@@ -925,6 +927,32 @@ def extract_stock_recommendations_from_summary(summary):
                                     exit_match = re.search(r'([^，。]*(?:止盈|止损)[^，。]*)', details_part)
                                     if exit_match:
                                         exit_strategy = exit_match.group(1).strip()
+                                
+                                # 尝试提取技术面支撑位/阻力位信息
+                                support_resistance = "待获取"
+                                if '支撑' in details_part or '阻力' in details_part:
+                                    sr_match = re.search(r'支撑[位]*[：:]*([^，。]+)[，。]?阻力[位]*[：:]*([^，。]+)', details_part)
+                                    if sr_match:
+                                        support_resistance = f"支撑{sr_match.group(1)}，阻力{sr_match.group(2)}"
+                                    else:
+                                        # 分别查找支撑和阻力
+                                        support_match = re.search(r'支撑[位]*[：:]*([^，。]+)', details_part)
+                                        resistance_match = re.search(r'阻力[位]*[：:]*([^，。]+)', details_part)
+                                        if support_match or resistance_match:
+                                            support = support_match.group(1) if support_match else "待确认"
+                                            resistance = resistance_match.group(1) if resistance_match else "待确认"
+                                            support_resistance = f"支撑{support}，阻力{resistance}"
+                                
+                                # 尝试提取最新股价信息
+                                current_price = "待获取"
+                                if '股价' in details_part or '价格' in details_part or '¥' in details_part:
+                                    price_match = re.search(r'[¥￥]?(\d+\.?\d*)', details_part)
+                                    if price_match:
+                                        current_price = f"¥{price_match.group(1)}"
+                                    elif '最新价格' in details_part:
+                                        price_match = re.search(r'最新价格[：:]*([^，。]+)', details_part)
+                                        if price_match:
+                                            current_price = price_match.group(1).strip()
                             
                             stock_data = {
                                 "code": stock_code,
@@ -935,6 +963,8 @@ def extract_stock_recommendations_from_summary(summary):
                                 "holding_period": holding_period,
                                 "entry_strategy": entry_strategy,
                                 "exit_strategy": exit_strategy,
+                                "support_resistance": support_resistance if 'support_resistance' in locals() else "待获取",
+                                "current_price": current_price if 'current_price' in locals() else "待获取",
                                 "impact": "中"  # 默认值
                             }
                             
@@ -1254,6 +1284,12 @@ if __name__ == "__main__":
                 stock_recommendations += f"买入策略：{stock['entry_strategy']}。\n"
                 stock_recommendations += f"卖出策略：{stock['exit_strategy']}\n"
                 
+                # 显示从AI摘要中提取的技术面信息
+                if stock.get('support_resistance') and stock['support_resistance'] != "待获取":
+                    stock_recommendations += f"技术面支撑/阻力：{stock['support_resistance']}\n"
+                if stock.get('current_price') and stock['current_price'] != "待获取":
+                    stock_recommendations += f"AI分析股价：{stock['current_price']}\n"
+                
                 # 显示最新价格数据
                 if real_time_data:
                     price_change_emoji = "📈" if real_time_data["price_change"] > 0 else "📉" if real_time_data["price_change"] < 0 else "➡️"
@@ -1315,6 +1351,12 @@ if __name__ == "__main__":
                 stock_recommendations += f"建议持仓时间：{stock['holding_period']}。\n"
                 stock_recommendations += f"买入策略：{stock['entry_strategy']}。\n"
                 stock_recommendations += f"卖出策略：{stock['exit_strategy']}\n"
+                
+                # 显示从AI摘要中提取的技术面信息
+                if stock.get('support_resistance') and stock['support_resistance'] != "待获取":
+                    stock_recommendations += f"技术面支撑/阻力：{stock['support_resistance']}\n"
+                if stock.get('current_price') and stock['current_price'] != "待获取":
+                    stock_recommendations += f"AI分析股价：{stock['current_price']}\n"
                 
                 # 显示最新价格数据
                 if real_time_data:
