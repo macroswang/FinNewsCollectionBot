@@ -864,6 +864,10 @@ def extract_stock_recommendations_from_summary(summary):
             for line in lines:
                 line = line.strip()
                 
+                # 跳过空行和分隔符
+                if not line or line == "---" or line == "——":
+                    continue
+                
                 # 热点板块股票
                 if "热点板块股票" in line or ("📈" in line and "A股" in line):
                     in_hot_stocks = True
@@ -935,8 +939,10 @@ def extract_stock_recommendations_from_summary(summary):
                                     
                                     if in_hot_stocks:
                                         stock_recommendations["hot_sector_stocks"].append(stock_data)
+                                        print(f"✅ 添加热点板块股票: {stock_code} {stock_name}")
                                     elif in_rotation_stocks:
                                         stock_recommendations["rotation_stocks"].append(stock_data)
+                                        print(f"✅ 添加轮动机会股票: {stock_code} {stock_name}")
                     except Exception as e:
                         print(f"⚠️ 解析股票信息失败: {stock_info}, 错误: {e}")
                         continue
@@ -1232,6 +1238,29 @@ if __name__ == "__main__":
     
     # 使用从AI摘要中提取的股票推荐
     print(f"🔍 检查股票推荐条件: hot_sector_stocks={bool(extracted_stocks['hot_sector_stocks'])}, rotation_stocks={bool(extracted_stocks['rotation_stocks'])}")
+    
+    # 如果没有从AI摘要中提取到股票，使用备用机制
+    if not extracted_stocks["hot_sector_stocks"] and not extracted_stocks["rotation_stocks"]:
+        print("⚠️ 未从AI摘要中提取到股票推荐，使用备用机制")
+        # 根据检测到的行业生成备用股票推荐
+        if related_industries:
+            # 选择前3个主要行业
+            main_industries = related_industries[:3]
+            print(f"🔍 使用备用行业生成股票推荐: {main_industries}")
+            
+            # 为热点板块和轮动机会分别生成股票
+            for i, industry in enumerate(main_industries):
+                if i < 2:  # 前2个行业作为热点板块
+                    fallback_stocks = get_fallback_stocks_by_industry(industry)
+                    if fallback_stocks:
+                        extracted_stocks["hot_sector_stocks"].extend(fallback_stocks[:2])  # 每个行业最多2只股票
+                        print(f"✅ 为热点板块添加{industry}行业股票: {len(fallback_stocks[:2])}只")
+                else:  # 第3个行业作为轮动机会
+                    fallback_stocks = get_fallback_stocks_by_industry(industry)
+                    if fallback_stocks:
+                        extracted_stocks["rotation_stocks"].extend(fallback_stocks[:2])  # 每个行业最多2只股票
+                        print(f"✅ 为轮动机会添加{industry}行业股票: {len(fallback_stocks[:2])}只")
+    
     if extracted_stocks["hot_sector_stocks"] or extracted_stocks["rotation_stocks"]:
         stock_recommendations = "## 🎯 A股投资机会（仅限A股股票）\n\n"
         
