@@ -199,19 +199,17 @@ def summarize(text, global_events=None):
                  - 买入时机：具体建议
                  - 止盈止损：价格区间
                  
-                 ## 🎯 板块投资机会
+                 ## 🎯 具体股票推荐（仅限A股）
                  
-                 ### 📈 热点板块（1-3天爆发预期）
-                 - 板块名称：具体推荐理由
-                 - 催化剂：触发因素和时间
-                 - 目标涨幅：预期收益
-                 - 风险提示：需要注意的风险
+                 ### 📈 热点板块股票（A股）
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
                  
-                 ### 🔄 轮动机会（超跌反弹）
-                 - 板块名称：反弹逻辑
-                 - 技术面：支撑位和阻力位
-                 - 买入时机：具体建议
-                 - 止盈止损：价格区间
+                 ### 🔄 轮动机会股票（A股）
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
                  
                  ## ⚠️ 风险提示
                  - 短期利空因素
@@ -236,6 +234,11 @@ def summarize(text, global_events=None):
                  - 重点关注板块轮动和热点切换
                  - 分析资金流向和情绪变化
                  - 提供具体的操作建议和风险控制
+                 - 推荐股票要结合新闻热点，优先选择中小盘股票（市值100-500亿）
+                 - 避免推荐超大市值股票（如茅台、宁德时代等）
+                 - **重要：只推荐A股股票，不要推荐港股、美股或其他海外股票**
+                 - 股票代码格式：6位数字（如000001、600000、300001等）
+                 - **关键要求：具体股票推荐必须从热点板块和轮动机会中通过AI分析总结后产生，确保推荐的股票与新闻热点和板块轮动逻辑直接相关**
                  """},
                 {"role": "user", "content": f"新闻内容：{text}\n\n{global_context}"}
             ]
@@ -1379,25 +1382,15 @@ if __name__ == "__main__":
     # 生成散户短线交易专用分析
     retail_analysis = generate_retail_short_term_summary()
     
-    # 从AI摘要中移除"具体股票推荐"部分，避免重复
+    # 保留AI摘要的完整内容，不再移除具体股票推荐部分
     cleaned_summary = summary
-    if "## 🎯 具体股票推荐（仅限A股）" in summary:
-        # 找到具体股票推荐部分的开始位置
-        start_pos = summary.find("## 🎯 具体股票推荐（仅限A股）")
-        # 找到下一个主要章节的开始位置
-        next_section_pos = summary.find("## ⚠️ 风险提示", start_pos)
-        if next_section_pos == -1:
-            next_section_pos = summary.find("## 💰 资金配置建议", start_pos)
-        if next_section_pos == -1:
-            next_section_pos = summary.find("## 📊 操作策略", start_pos)
-        if next_section_pos == -1:
-            next_section_pos = len(summary)
-        
-        # 移除具体股票推荐部分
-        cleaned_summary = summary[:start_pos] + summary[next_section_pos:]
     
     # 生成仅展示标题和链接的最终消息
-    final_summary = f"📅 **{today_str} 散户短线交易专用分析**\n\n{retail_analysis}{sentiment_section}{indices_section}{timing_section}{global_analysis}✍️ **今日分析总结：**\n{cleaned_summary}\n\n{stock_recommendations}---\n\n"
+    # 如果AI摘要中包含具体股票推荐，则不显示重复的stock_recommendations
+    if "## 🎯 具体股票推荐（仅限A股）" in cleaned_summary:
+        final_summary = f"📅 **{today_str} 散户短线交易专用分析**\n\n{retail_analysis}{sentiment_section}{indices_section}{timing_section}{global_analysis}✍️ **今日分析总结：**\n{cleaned_summary}\n\n---\n\n"
+    else:
+        final_summary = f"📅 **{today_str} 散户短线交易专用分析**\n\n{retail_analysis}{sentiment_section}{indices_section}{timing_section}{global_analysis}✍️ **今日分析总结：**\n{cleaned_summary}\n\n{stock_recommendations}---\n\n"
     for category, content in articles_data.items():
         # 跳过美国经济和世界经济部分，不显示英文内容
         if category == "🇺🇸 美国经济" or category == "🌍 世界经济":
