@@ -682,263 +682,6 @@ def generate_stock_recommendations(industry):
     """基于行业生成股票推荐模板（已废弃，使用get_specific_stock_recommendations）"""
     return get_fallback_stocks_by_industry(industry)
 
-# 新增：短线交易专用中小盘股票池
-def get_short_term_stocks_by_industry(industry):
-    """为短线交易专门推荐中小盘股票，更适合散户操作"""
-    short_term_stocks = {
-        "新能源": [
-            {"code": "300207", "name": "欣旺达", "reason": "动力电池pack龙头，弹性较大，短线机会多", "risk": "中", "impact": "中", "short_term_potential": "高", "holding_period": "1-3天", "entry_strategy": "回调买入，关注量能", "exit_strategy": "快速止盈，控制风险"},
-            {"code": "300014", "name": "亿纬锂能", "reason": "锂电池细分龙头，技术领先，短线活跃", "risk": "中", "impact": "中", "short_term_potential": "高", "holding_period": "1-3天", "entry_strategy": "突破买入，关注技术形态", "exit_strategy": "及时止盈，避免追高"},
-            {"code": "002460", "name": "赣锋锂业", "reason": "锂资源龙头，价格弹性大，短线机会明显", "risk": "高", "impact": "高", "short_term_potential": "高", "holding_period": "1-2天", "entry_strategy": "低吸买入，关注锂价", "exit_strategy": "快速止盈，严格止损"},
-            {"code": "300450", "name": "先导智能", "reason": "锂电设备龙头，订单驱动，短线活跃", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "2-3天", "entry_strategy": "回调买入，关注订单", "exit_strategy": "分批止盈，控制风险"}
-        ],
-        "半导体": [
-            {"code": "300661", "name": "圣邦股份", "reason": "模拟芯片设计，技术壁垒高，弹性大", "risk": "高", "impact": "中", "short_term_potential": "高", "holding_period": "1-3天", "entry_strategy": "回调买入，关注技术突破", "exit_strategy": "快速止盈，严格止损"},
-            {"code": "688396", "name": "华润微", "reason": "功率半导体龙头，国产替代加速", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "2-3天", "entry_strategy": "突破买入，关注产能", "exit_strategy": "及时止盈，控制风险"},
-            {"code": "300782", "name": "卓胜微", "reason": "射频芯片龙头，5G概念，短线活跃", "risk": "高", "impact": "高", "short_term_potential": "高", "holding_period": "1-2天", "entry_strategy": "低吸买入，关注5G进展", "exit_strategy": "快速止盈，避免追高"},
-            {"code": "688536", "name": "思瑞浦", "reason": "模拟芯片设计，技术领先，弹性大", "risk": "高", "impact": "中", "short_term_potential": "中", "holding_period": "1-2天", "entry_strategy": "回调买入，关注技术面", "exit_strategy": "及时止盈，严格止损"}
-        ],
-        "医药": [
-            {"code": "300122", "name": "智飞生物", "reason": "疫苗龙头，政策支持，短线机会多", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "2-3天", "entry_strategy": "回调买入，关注政策", "exit_strategy": "分批止盈，控制风险"},
-            {"code": "300601", "name": "康泰生物", "reason": "疫苗研发领先，弹性较大，短线活跃", "risk": "高", "impact": "中", "short_term_potential": "高", "holding_period": "1-3天", "entry_strategy": "突破买入，关注研发进展", "exit_strategy": "快速止盈，严格止损"},
-            {"code": "300347", "name": "泰格医药", "reason": "CRO龙头，创新药服务，短线机会", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "2-3天", "entry_strategy": "低吸买入，关注订单", "exit_strategy": "及时止盈，避免追高"},
-            {"code": "300759", "name": "康龙化成", "reason": "CRO服务，海外订单增长，短线活跃", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "1-3天", "entry_strategy": "回调买入，关注业绩", "exit_strategy": "分批止盈，控制风险"}
-        ],
-        "消费": [
-            {"code": "002304", "name": "洋河股份", "reason": "白酒行业领先，渠道优势，短线活跃", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "1-3天", "entry_strategy": "突破买入，关注业绩", "exit_strategy": "快速止盈，控制风险"},
-            {"code": "000596", "name": "古井贡酒", "reason": "区域白酒龙头，品牌价值，短线机会", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "2-3天", "entry_strategy": "回调买入，关注销量", "exit_strategy": "及时止盈，避免追高"},
-            {"code": "600809", "name": "山西汾酒", "reason": "清香型白酒龙头，全国化扩张，短线活跃", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "1-3天", "entry_strategy": "低吸买入，关注扩张", "exit_strategy": "分批止盈，控制风险"},
-            {"code": "002568", "name": "百润股份", "reason": "预调酒龙头，年轻消费，短线机会", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "2-3天", "entry_strategy": "回调买入，关注新品", "exit_strategy": "及时止盈，避免追高"}
-        ],
-        "科技": [
-            {"code": "002241", "name": "歌尔股份", "reason": "消费电子制造，VR概念，短线活跃", "risk": "中", "impact": "高", "short_term_potential": "高", "holding_period": "1-3天", "entry_strategy": "回调买入，关注订单", "exit_strategy": "快速止盈，控制风险"},
-            {"code": "002475", "name": "立讯精密", "reason": "消费电子龙头，苹果概念，短线机会", "risk": "中", "impact": "高", "short_term_potential": "高", "holding_period": "2-4天", "entry_strategy": "突破买入，关注技术", "exit_strategy": "分批止盈，设置止损"},
-            {"code": "300433", "name": "蓝思科技", "reason": "玻璃盖板龙头，消费电子，短线活跃", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "1-3天", "entry_strategy": "低吸买入，关注创新", "exit_strategy": "及时止盈，避免追高"},
-            {"code": "002456", "name": "欧菲光", "reason": "光学镜头龙头，汽车电子，短线机会", "risk": "高", "impact": "中", "short_term_potential": "中", "holding_period": "1-2天", "entry_strategy": "回调买入，关注转型", "exit_strategy": "快速止盈，严格止损"}
-        ],
-        "基建": [
-            {"code": "002271", "name": "东方雨虹", "reason": "防水材料龙头，基建受益，短线活跃", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "2-3天", "entry_strategy": "回调买入，关注订单", "exit_strategy": "分批止盈，控制风险"},
-            {"code": "000877", "name": "天山股份", "reason": "水泥龙头，基建投资，短线机会", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "1-3天", "entry_strategy": "突破买入，关注价格", "exit_strategy": "及时止盈，避免追高"},
-            {"code": "600585", "name": "海螺水泥", "reason": "水泥行业龙头，成本优势，短线活跃", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "2-3天", "entry_strategy": "低吸买入，关注需求", "exit_strategy": "分批止盈，控制风险"},
-            {"code": "002271", "name": "东方雨虹", "reason": "防水材料，基建加码，短线机会", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "1-3天", "entry_strategy": "回调买入，关注政策", "exit_strategy": "及时止盈，避免追高"}
-        ],
-        "银行": [
-            {"code": "002142", "name": "宁波银行", "reason": "城商行龙头，零售转型，短线活跃", "risk": "低", "impact": "中", "short_term_potential": "中", "holding_period": "2-3天", "entry_strategy": "回调买入，关注业绩", "exit_strategy": "分批止盈，控制风险"},
-            {"code": "600000", "name": "浦发银行", "reason": "股份制银行，资产质量改善，短线机会", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "1-3天", "entry_strategy": "突破买入，关注转型", "exit_strategy": "及时止盈，避免追高"},
-            {"code": "000001", "name": "平安银行", "reason": "零售银行领先，数字化转型，短线活跃", "risk": "低", "impact": "中", "short_term_potential": "中", "holding_period": "2-4天", "entry_strategy": "低吸买入，关注创新", "exit_strategy": "分批止盈，长期持有"},
-            {"code": "600036", "name": "招商银行", "reason": "零售银行龙头，资产质量优良，短线机会", "risk": "低", "impact": "中", "short_term_potential": "中", "holding_period": "3-5天", "entry_strategy": "回调买入，关注分红", "exit_strategy": "分批止盈，价值投资"}
-        ],
-        "化工": [
-            {"code": "002648", "name": "卫星化学", "reason": "石化新材料龙头，技术领先，短线活跃", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "1-3天", "entry_strategy": "突破买入，关注产能", "exit_strategy": "及时止盈，控制风险"},
-            {"code": "600426", "name": "华鲁恒升", "reason": "煤化工龙头，成本优势，短线机会", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "2-3天", "entry_strategy": "低吸买入，关注成本", "exit_strategy": "分批止盈，避免追高"},
-            {"code": "002601", "name": "龙佰集团", "reason": "钛白粉龙头，价格弹性，短线活跃", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "1-3天", "entry_strategy": "回调买入，关注价格", "exit_strategy": "及时止盈，控制风险"},
-            {"code": "600309", "name": "万华化学", "reason": "化工龙头，MDI全球领先，短线机会", "risk": "中", "impact": "中", "short_term_potential": "中", "holding_period": "2-4天", "entry_strategy": "回调买入，关注价格", "exit_strategy": "分批止盈，设置止损"}
-        ]
-    }
-    return short_term_stocks.get(industry, [])
-
-# 新增：从AI摘要中提取短线交易机会信息
-def extract_short_term_opportunities(summary):
-    """从AI摘要中提取短线交易机会信息"""
-    opportunities = {
-        "hot_sectors": [],  # 热点板块
-        "rotation_opportunities": [],  # 轮动机会
-        "risk_warnings": [],  # 风险提示
-        "funding_advice": [],  # 资金配置建议
-        "operation_strategy": []  # 操作策略
-    }
-    
-    try:
-        # 提取热点板块
-        if "热点板块" in summary or "短线交易机会" in summary:
-            lines = summary.split('\n')
-            in_hot_sectors = False
-            in_rotation = False
-            in_risks = False
-            in_funding = False
-            in_strategy = False
-            
-            for line in lines:
-                line = line.strip()
-                
-                # 热点板块
-                if "热点板块" in line or "📈" in line:
-                    in_hot_sectors = True
-                    in_rotation = False
-                    in_risks = False
-                    in_funding = False
-                    in_strategy = False
-                    continue
-                
-                # 轮动机会
-                elif "轮动机会" in line or "🔄" in line:
-                    in_hot_sectors = False
-                    in_rotation = True
-                    in_risks = False
-                    in_funding = False
-                    in_strategy = False
-                    continue
-                
-                # 风险提示
-                elif "风险提示" in line or "⚠️" in line:
-                    in_hot_sectors = False
-                    in_rotation = False
-                    in_risks = True
-                    in_funding = False
-                    in_strategy = False
-                    continue
-                
-                # 资金配置
-                elif "资金配置" in line or "💰" in line:
-                    in_hot_sectors = False
-                    in_rotation = False
-                    in_risks = False
-                    in_funding = True
-                    in_strategy = False
-                    continue
-                
-                # 操作策略
-                elif "操作策略" in line or "📊" in line:
-                    in_hot_sectors = False
-                    in_rotation = False
-                    in_risks = False
-                    in_funding = False
-                    in_strategy = True
-                    continue
-                
-                # 遇到新的标题，停止当前提取
-                elif line.startswith('##') or line.startswith('###'):
-                    in_hot_sectors = False
-                    in_rotation = False
-                    in_risks = False
-                    in_funding = False
-                    in_strategy = False
-                    continue
-                
-                # 提取内容
-                if in_hot_sectors and line.startswith('-') and len(line) > 2:
-                    opportunities["hot_sectors"].append(line[1:].strip())
-                elif in_rotation and line.startswith('-') and len(line) > 2:
-                    opportunities["rotation_opportunities"].append(line[1:].strip())
-                elif in_risks and line.startswith('-') and len(line) > 2:
-                    opportunities["risk_warnings"].append(line[1:].strip())
-                elif in_funding and line.startswith('-') and len(line) > 2:
-                    opportunities["funding_advice"].append(line[1:].strip())
-                elif in_strategy and line.startswith('-') and len(line) > 2:
-                    opportunities["operation_strategy"].append(line[1:].strip())
-        
-        # 如果没有提取到内容，使用默认值
-        if not opportunities["hot_sectors"]:
-            opportunities["hot_sectors"] = ["科技板块：AI概念股活跃，关注回调机会", "新能源：政策利好频出，短线机会明显"]
-        if not opportunities["rotation_opportunities"]:
-            opportunities["rotation_opportunities"] = ["消费板块：超跌反弹机会，关注白酒龙头", "医药板块：创新药政策支持，关注龙头股"]
-        if not opportunities["risk_warnings"]:
-            opportunities["risk_warnings"] = ["高位股：避免追高，等待回调", "概念股：注意风险，快进快出"]
-        if not opportunities["funding_advice"]:
-            opportunities["funding_advice"] = ["总仓位建议：70%短线+30%现金", "单笔投资比例：5-8%"]
-        if not opportunities["operation_strategy"]:
-            opportunities["operation_strategy"] = ["买入时机：早盘低开或尾盘回调时买入", "卖出策略：分批止盈，目标≤10%"]
-            
-    except Exception as e:
-        print(f"⚠️ 提取短线交易机会失败: {e}")
-        # 使用默认值
-        opportunities["hot_sectors"] = ["科技板块：AI概念股活跃，关注回调机会", "新能源：政策利好频出，短线机会明显"]
-        opportunities["rotation_opportunities"] = ["消费板块：超跌反弹机会，关注白酒龙头", "医药板块：创新药政策支持，关注龙头股"]
-        opportunities["risk_warnings"] = ["高位股：避免追高，等待回调", "概念股：注意风险，快进快出"]
-        opportunities["funding_advice"] = ["总仓位建议：70%短线+30%现金", "单笔投资比例：5-8%"]
-        opportunities["operation_strategy"] = ["买入时机：早盘低开或尾盘回调时买入", "卖出策略：分批止盈，目标≤10%"]
-    
-    return opportunities
-
-# 新增：智能股票推荐函数，优先推荐中小盘股票
-def get_smart_stock_recommendations(industry, news_summary, short_term_opportunities=None, prefer_small_cap=True):
-    """智能股票推荐，优先推荐适合短线交易的中小盘股票"""
-    try:
-        # 使用AI推荐
-        print(f"🤖 正在为{industry}行业生成AI股票推荐...")
-        
-        # 构建短线交易机会上下文
-        short_term_context = ""
-        if short_term_opportunities:
-            short_term_context = f"""
-            
-            短线交易机会分析：
-            - 热点板块：{', '.join(short_term_opportunities.get('hot_sectors', [])[:2])}
-            - 轮动机会：{', '.join(short_term_opportunities.get('rotation_opportunities', [])[:2])}
-            - 风险提示：{', '.join(short_term_opportunities.get('risk_warnings', [])[:2])}
-            - 操作策略：{', '.join(short_term_opportunities.get('operation_strategy', [])[:2])}
-            """
-        
-        prompt = f"""
-        基于以下新闻摘要和短线交易机会分析，为{industry}行业推荐3-4只适合散户短线交易的股票。
-        
-        新闻摘要：{news_summary}{short_term_context}
-        
-        要求：
-        1. 优先推荐中小盘股票（市值100-500亿），适合短线交易
-        2. 避免推荐超大市值股票（如茅台、宁德时代等）
-        3. 股票要有足够的流动性和活跃度
-        4. 推荐理由要结合今日新闻热点和短线交易机会
-        5. 风险等级要合理评估，参考风险提示
-        6. 持仓时间建议1-5天，符合短线交易特点
-        7. 买入卖出策略要参考操作策略建议
-        
-        返回格式：
-        {{
-            "stocks": [
-                {{
-                    "code": "股票代码",
-                    "name": "股票名称", 
-                    "reason": "推荐理由（结合新闻热点和短线机会）",
-                    "risk": "风险等级（低/中/高）",
-                    "impact": "影响程度（低/中/高）",
-                    "short_term_potential": "短线潜力（低/中/高）",
-                    "holding_period": "建议持仓时间",
-                    "entry_strategy": "买入策略",
-                    "exit_strategy": "卖出策略"
-                }}
-            ]
-        }}
-        """
-        
-        completion = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=1000
-        )
-        
-        response_text = completion.choices[0].message.content.strip()
-        
-        try:
-            import json
-            result = json.loads(response_text)
-            stocks = result.get("stocks", [])
-            
-            # 验证股票行业分类
-            verified_stocks = []
-            for stock in stocks:
-                if verify_stock_industry(stock["code"], industry):
-                    verified_stocks.append(stock)
-                    print(f"✅ {stock['code']} {stock['name']} 验证为{industry}行业")
-                else:
-                    actual_industry = get_stock_industry(stock["code"])
-                    print(f"❌ {stock['code']} {stock['name']} 实际为{actual_industry}行业，不属于{industry}行业，已过滤")
-            
-            if verified_stocks:
-                return verified_stocks
-            else:
-                print(f"⚠️ {industry}行业没有找到合适的股票推荐")
-                return []
-                
-        except json.JSONDecodeError:
-            print(f"⚠️ AI返回格式错误，{industry}行业无推荐")
-            return []
-            
-    except Exception as e:
-        print(f"⚠️ 智能股票推荐失败: {e}，{industry}行业无推荐")
-        return []
-
 # 全球事件联动分析系统
 def analyze_global_market_linkage(news_text):
     """分析全球市场联动关系"""
@@ -1192,9 +935,6 @@ if __name__ == "__main__":
     
     # AI生成摘要（包含全球联动分析）
     summary = summarize(analysis_text, global_events)
-    
-    # 从AI摘要中提取短线交易机会信息
-    short_term_opportunities = extract_short_term_opportunities(summary)
 
     # 生成市场情绪和时机分析部分
     sentiment_section = "## 📊 市场情绪概览\n"
@@ -1228,23 +968,11 @@ if __name__ == "__main__":
     # 生成股票推荐部分
     stock_recommendations = ""
     if related_industries:
-        stock_recommendations = "## 🎯 A股投资机会（短线交易专用）\n\n"
-        
-        # 添加短线交易机会关联说明
-        if short_term_opportunities and short_term_opportunities.get('hot_sectors'):
-            stock_recommendations += "💡 **关联短线交易机会**: 以下推荐基于AI分析的短线交易机会生成\n"
-            stock_recommendations += f"- **热点板块**: {', '.join(short_term_opportunities['hot_sectors'][:2])}\n"
-            if short_term_opportunities.get('rotation_opportunities'):
-                stock_recommendations += f"- **轮动机会**: {', '.join(short_term_opportunities['rotation_opportunities'][:2])}\n"
-            stock_recommendations += "\n"
-        
-        has_recommendations = False
-        
+        stock_recommendations = "## 🎯 A股投资机会\n\n"
         for industry in related_industries[:3]:  # 最多推荐3个行业
-            print(f"🤖 正在为{industry}行业生成短线股票推荐...")
-            stocks = get_smart_stock_recommendations(industry, summary, short_term_opportunities, prefer_small_cap=True)
+            print(f"🤖 正在为{industry}行业生成股票推荐...")
+            stocks = get_specific_stock_recommendations(industry, summary)
             if stocks:
-                has_recommendations = True
                 stock_recommendations += f"### 📈 {industry}板块\n"
                 for stock in stocks[:3]:  # 每个行业最多3只股票
                     # 再次验证股票行业分类
@@ -1313,84 +1041,34 @@ if __name__ == "__main__":
                         stock_recommendations += f"  - **数据处理错误**，请手动查询\n"
                     
                     stock_recommendations += "\n"
+        stock_recommendations += "⚠️ **投资提醒**: 以上推荐基于今日新闻动态生成，仅供参考，投资有风险，入市需谨慎！\n\n"
         
-        # 检查是否有任何推荐
-        if not has_recommendations:
-            stock_recommendations += "📭 **今日无推荐**: 基于当前新闻分析，暂无可推荐的短线交易机会\n"
-            stock_recommendations += "- 建议关注市场整体走势，等待更好的机会\n"
-            stock_recommendations += "- 可以关注其他板块的轮动机会\n"
-            stock_recommendations += "- 保持耐心，不急于建仓\n\n"
-        else:
-            stock_recommendations += "💡 **短线交易说明**: 以上推荐均为中小盘股票，更适合散户短线操作，具有以下特点：\n"
-            stock_recommendations += "- **弹性较大**: 中小盘股票波动性更强，短线机会更多\n"
-            stock_recommendations += "- **资金效率**: 适合散户资金量，进出灵活\n"
-            stock_recommendations += "- **活跃度高**: 成交量相对活跃，便于短线交易\n"
-            stock_recommendations += "- **风险可控**: 单只股票风险相对可控\n\n"
-            stock_recommendations += "⚠️ **投资提醒**: 以上推荐基于今日新闻动态生成，仅供参考，投资有风险，入市需谨慎！\n\n"
+        # 添加短线交易策略建议
+        strategy_section = "## 💡 散户短线交易策略\n\n"
+        strategy_section += "### 📈 建仓策略\n"
+        strategy_section += "- **分批建仓**: 建议分2-3次建仓，降低单次风险\n"
+        strategy_section += "- **仓位控制**: 单只股票不超过总仓位的5-8%（资金量有限）\n"
+        strategy_section += "- **时机把握**: 关注回调机会，避免追高\n"
+        strategy_section += "- **快进快出**: 1-5个交易日完成交易\n\n"
         
-        # 添加短线交易策略建议（只在有推荐时显示）
-        if has_recommendations:
-            strategy_section = "## 💡 散户短线交易策略\n\n"
-            
-            # 使用从AI摘要中提取的策略信息
-            if short_term_opportunities:
-                # 建仓策略
-                strategy_section += "### 📈 建仓策略\n"
-                operation_strategy = short_term_opportunities.get('operation_strategy', [])
-                if operation_strategy:
-                    for strategy in operation_strategy[:3]:  # 最多显示3条
-                        strategy_section += f"- **{strategy.split('：')[0] if '：' in strategy else '策略'}**: {strategy.split('：')[1] if '：' in strategy else strategy}\n"
-                else:
-                    strategy_section += "- **分批建仓**: 建议分2-3次建仓，降低单次风险\n"
-                    strategy_section += "- **仓位控制**: 单只股票不超过总仓位的5-8%\n"
-                    strategy_section += "- **时机把握**: 关注回调机会，避免追高\n"
-                strategy_section += "\n"
-                
-                # 风险控制
-                strategy_section += "### 🛡️ 风险控制\n"
-                risk_warnings = short_term_opportunities.get('risk_warnings', [])
-                if risk_warnings:
-                    for risk in risk_warnings[:3]:  # 最多显示3条
-                        strategy_section += f"- **{risk.split('：')[0] if '：' in risk else '风险'}**: {risk.split('：')[1] if '：' in risk else risk}\n"
-                else:
-                    strategy_section += "- **止损设置**: 严格执行止损，不超过-3%\n"
-                    strategy_section += "- **止盈策略**: 分批止盈，目标≤10%\n"
-                    strategy_section += "- **分散投资**: 避免过度集中在单一行业\n"
-                strategy_section += "\n"
-                
-                # 资金配置
-                strategy_section += "### 💰 资金配置建议\n"
-                funding_advice = short_term_opportunities.get('funding_advice', [])
-                if funding_advice:
-                    for advice in funding_advice[:2]:  # 最多显示2条
-                        strategy_section += f"- **{advice.split('：')[0] if '：' in advice else '配置'}**: {advice.split('：')[1] if '：' in advice else advice}\n"
-                else:
-                    strategy_section += "- **总仓位建议**: 70%短线+30%现金\n"
-                    strategy_section += "- **单笔投资比例**: 5-8%\n"
-                strategy_section += "\n"
-            else:
-                # 使用默认策略
-                strategy_section += "### 📈 建仓策略\n"
-                strategy_section += "- **分批建仓**: 建议分2-3次建仓，降低单次风险\n"
-                strategy_section += "- **仓位控制**: 单只股票不超过总仓位的5-8%\n"
-                strategy_section += "- **时机把握**: 关注回调机会，避免追高\n\n"
-                
-                strategy_section += "### 🛡️ 风险控制\n"
-                strategy_section += "- **止损设置**: 严格执行止损，不超过-3%\n"
-                strategy_section += "- **止盈策略**: 分批止盈，目标≤10%\n"
-                strategy_section += "- **分散投资**: 避免过度集中在单一行业\n\n"
-                
-                strategy_section += "### 💰 资金配置建议\n"
-                strategy_section += "- **总仓位建议**: 70%短线+30%现金\n"
-                strategy_section += "- **单笔投资比例**: 5-8%\n\n"
-            
-            # 散户优势（固定内容）
-            strategy_section += "### 🎯 散户优势发挥\n"
-            strategy_section += "- **灵活操作**: 资金量小，进出灵活\n"
-            strategy_section += "- **快速反应**: 及时捕捉市场机会\n"
-            strategy_section += "- **风险可控**: 单笔损失有限，心理压力小\n\n"
-            
-            stock_recommendations += strategy_section
+        strategy_section += "### 🛡️ 风险控制\n"
+        strategy_section += "- **止损设置**: 严格执行止损，不超过-3%\n"
+        strategy_section += "- **止盈策略**: 分批止盈，目标≤10%\n"
+        strategy_section += "- **分散投资**: 避免过度集中在单一行业\n"
+        strategy_section += "- **资金管理**: 预留30%资金应对机会\n\n"
+        
+        strategy_section += "### 📊 短线操作要点\n"
+        strategy_section += "- **每日检视**: 每个交易日评估持仓表现\n"
+        strategy_section += "- **及时止盈**: 达到目标及时卖出，不贪心\n"
+        strategy_section += "- **严格止损**: 触及止损位立即卖出\n"
+        strategy_section += "- **关注量能**: 成交量是短线交易的重要指标\n\n"
+        
+        strategy_section += "### 🎯 散户优势发挥\n"
+        strategy_section += "- **灵活操作**: 资金量小，进出灵活\n"
+        strategy_section += "- **快速反应**: 及时捕捉市场机会\n"
+        strategy_section += "- **风险可控**: 单笔损失有限，心理压力小\n\n"
+        
+        stock_recommendations += strategy_section
 
     # 生成散户短线交易专用分析
     retail_analysis = generate_retail_short_term_summary()
