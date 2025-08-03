@@ -1247,12 +1247,14 @@ if __name__ == "__main__":
             global_analysis += f"  - 国内映射: {', '.join(event['国内映射'])}\n\n"
         global_analysis += "💡 **联动提示**: 全球事件通过资金流向、情绪传导、供应链影响等方式影响A股市场\n\n"
 
-    # 生成股票推荐部分
+    # 生成股票推荐部分（仅用于AI摘要中没有股票推荐的情况）
     stock_recommendations = ""
     
     # 使用从AI摘要中提取的股票推荐
     print(f"🔍 检查股票推荐条件: hot_sector_stocks={bool(extracted_stocks['hot_sector_stocks'])}, rotation_stocks={bool(extracted_stocks['rotation_stocks'])}")
     
+    # 注意：这里的股票推荐生成逻辑只在AI摘要中没有股票推荐时使用
+    # 如果AI摘要中已有股票推荐，实时数据更新会在后面的逻辑中处理
     if extracted_stocks["hot_sector_stocks"] or extracted_stocks["rotation_stocks"]:
         stock_recommendations = "## 🎯 具体股票推荐（仅限A股）\n\n"
         
@@ -1439,8 +1441,73 @@ if __name__ == "__main__":
     print(f"🔍 AI摘要中是否包含6位数字股票代码: {has_6digit_codes}")
     
     if has_stock_recommendations_in_summary:
-        # AI摘要中已包含股票推荐，不再添加重复内容
-        final_summary = f"📅 **{today_str} 散户短线交易专用分析**\n\n{retail_analysis}{sentiment_section}{indices_section}{timing_section}{global_analysis}✍️ **今日分析总结：**\n{cleaned_summary}\n\n---\n\n"
+        # AI摘要中已包含股票推荐，但需要用实时数据更新股票信息
+        # 从AI摘要中提取股票推荐，然后用实时数据更新
+        updated_summary = cleaned_summary
+        
+        # 如果提取到了股票推荐，用实时数据更新AI摘要中的股票信息
+        if extracted_stocks["hot_sector_stocks"] or extracted_stocks["rotation_stocks"]:
+            print("🔄 检测到AI摘要中包含股票推荐，正在用实时数据更新...")
+            
+            # 更新热点板块股票
+            for stock in extracted_stocks["hot_sector_stocks"]:
+                try:
+                    real_time_data = get_real_time_stock_data(stock["code"])
+                    if real_time_data:
+                        # 构建新的股票信息行
+                        new_stock_line = f"**{stock['code']} {stock['name']}**\n"
+                        new_stock_line += f"推荐理由：{stock['reason']}。\n"
+                        new_stock_line += f"风险等级：{stock['risk']}。\n"
+                        new_stock_line += f"短线潜力：{stock['short_term_potential']}。\n"
+                        new_stock_line += f"持仓时间：{stock['holding_period']}。\n"
+                        new_stock_line += f"技术面：支撑位{real_time_data.get('recent_low', 'N/A')}元，阻力位{real_time_data.get('recent_high', 'N/A')}元（当前价{real_time_data['current_price']}元）。\n"
+                        
+                        # 在AI摘要中查找并替换对应的股票信息
+                        old_pattern = f"**{stock['code']} {stock['name']}**"
+                        if old_pattern in updated_summary:
+                            # 找到旧信息并替换
+                            import re
+                            # 匹配从股票代码开始到下一个股票或段落结束的内容
+                            # 更精确的匹配模式：从股票代码开始到下一个股票代码或章节标题结束
+                            pattern = rf"{re.escape(old_pattern)}.*?(?=\*\*\d{{6}}\s+\w+|\n##|\n###|\Z)"
+                            replacement = new_stock_line.rstrip()
+                            updated_summary = re.sub(pattern, replacement, updated_summary, flags=re.DOTALL)
+                            print(f"✅ 已更新 {stock['code']} {stock['name']} 的实时数据")
+                        else:
+                            print(f"⚠️ 在AI摘要中未找到 {stock['code']} {stock['name']} 的原始信息")
+                except Exception as e:
+                    print(f"⚠️ 更新 {stock['code']} 实时数据失败: {e}")
+            
+            # 更新轮动机会股票
+            for stock in extracted_stocks["rotation_stocks"]:
+                try:
+                    real_time_data = get_real_time_stock_data(stock["code"])
+                    if real_time_data:
+                        # 构建新的股票信息行
+                        new_stock_line = f"**{stock['code']} {stock['name']}**\n"
+                        new_stock_line += f"推荐理由：{stock['reason']}。\n"
+                        new_stock_line += f"风险等级：{stock['risk']}。\n"
+                        new_stock_line += f"短线潜力：{stock['short_term_potential']}。\n"
+                        new_stock_line += f"持仓时间：{stock['holding_period']}。\n"
+                        new_stock_line += f"技术面：支撑位{real_time_data.get('recent_low', 'N/A')}元，阻力位{real_time_data.get('recent_high', 'N/A')}元（当前价{real_time_data['current_price']}元）。\n"
+                        
+                        # 在AI摘要中查找并替换对应的股票信息
+                        old_pattern = f"**{stock['code']} {stock['name']}**"
+                        if old_pattern in updated_summary:
+                            # 找到旧信息并替换
+                            import re
+                            # 匹配从股票代码开始到下一个股票或段落结束的内容
+                            # 更精确的匹配模式：从股票代码开始到下一个股票代码或章节标题结束
+                            pattern = rf"{re.escape(old_pattern)}.*?(?=\*\*\d{{6}}\s+\w+|\n##|\n###|\Z)"
+                            replacement = new_stock_line.rstrip()
+                            updated_summary = re.sub(pattern, replacement, updated_summary, flags=re.DOTALL)
+                            print(f"✅ 已更新 {stock['code']} {stock['name']} 的实时数据")
+                        else:
+                            print(f"⚠️ 在AI摘要中未找到 {stock['code']} {stock['name']} 的原始信息")
+                except Exception as e:
+                    print(f"⚠️ 更新 {stock['code']} 实时数据失败: {e}")
+        
+        final_summary = f"📅 **{today_str} 散户短线交易专用分析**\n\n{retail_analysis}{sentiment_section}{indices_section}{timing_section}{global_analysis}✍️ **今日分析总结：**\n{updated_summary}\n\n---\n\n"
     else:
         # AI摘要中未包含股票推荐，添加单独生成的股票推荐
         final_summary = f"📅 **{today_str} 散户短线交易专用分析**\n\n{retail_analysis}{sentiment_section}{indices_section}{timing_section}{global_analysis}✍️ **今日分析总结：**\n{cleaned_summary}\n\n{stock_recommendations}---\n\n"
