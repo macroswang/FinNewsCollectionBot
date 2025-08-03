@@ -202,14 +202,14 @@ def summarize(text, global_events=None):
                  ## 🎯 具体股票推荐（仅限A股）
                  
                  ### 📈 热点板块股票（A股）
-                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
-                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
-                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
                  
                  ### 🔄 轮动机会股票（A股）
-                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
-                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
-                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
                  
                  ## ⚠️ 风险提示
                  - 短期利空因素
@@ -854,6 +854,7 @@ def extract_stock_recommendations_from_summary(summary):
     }
     
     try:
+        print(f"🔍 检查摘要内容: 包含'具体股票推荐'={'具体股票推荐' in summary}, 包含'热点板块股票'={'热点板块股票' in summary}, 包含'A股'={'A股' in summary}")
         if "具体股票推荐" in summary or "热点板块股票" in summary or "A股" in summary:
             lines = summary.split('\n')
             in_hot_stocks = False
@@ -863,15 +864,17 @@ def extract_stock_recommendations_from_summary(summary):
                 line = line.strip()
                 
                 # 热点板块股票
-                if ("热点板块股票" in line or "📈" in line) and "A股" in line:
+                if "热点板块股票" in line or ("📈" in line and "A股" in line):
                     in_hot_stocks = True
                     in_rotation_stocks = False
+                    print(f"🔍 找到热点板块股票标题: {line}")
                     continue
                 
                 # 轮动机会股票
-                elif ("轮动机会股票" in line or "🔄" in line) and "A股" in line:
+                elif "轮动机会股票" in line or ("🔄" in line and "A股" in line):
                     in_hot_stocks = False
                     in_rotation_stocks = True
+                    print(f"🔍 找到轮动机会股票标题: {line}")
                     continue
                 
                 # 遇到新的标题，停止当前提取
@@ -882,13 +885,19 @@ def extract_stock_recommendations_from_summary(summary):
                 
                 # 提取股票信息
                 if (in_hot_stocks or in_rotation_stocks) and line.startswith('-') and len(line) > 2:
+                    print(f"🔍 正在处理股票信息行: {line}")
+                    print(f"🔍 当前状态: in_hot_stocks={in_hot_stocks}, in_rotation_stocks={in_rotation_stocks}")
                     stock_info = line[1:].strip()
                     
                     # 解析股票信息
                     try:
-                        # 格式：股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
-                        if '：' in stock_info:
-                            stock_part, details_part = stock_info.split('：', 1)
+                        # 格式：股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                        if ':' in stock_info or '：' in stock_info:
+                            # 优先使用英文冒号，如果没有则使用中文冒号
+                            if ':' in stock_info:
+                                stock_part, details_part = stock_info.split(':', 1)
+                            else:
+                                stock_part, details_part = stock_info.split('：', 1)
                             
                             # 提取股票代码和名称
                             parts = stock_part.strip().split()
@@ -1155,7 +1164,7 @@ def generate_retail_short_term_summary():
 
 if __name__ == "__main__":
     # 运行行业分类测试
-    test_stock_industry_classification()
+    # test_stock_industry_classification()
     
     today_str = today_date().strftime("%Y-%m-%d")
 
@@ -1178,9 +1187,15 @@ if __name__ == "__main__":
     
     # AI生成摘要（包含全球联动分析）
     summary = summarize(analysis_text, global_events)
+    print(f"📝 AI生成的摘要长度: {len(summary)}")
+    print(f"📝 摘要是否包含'具体股票推荐': {'具体股票推荐' in summary}")
+    print(f"📝 摘要是否包含'A股': {'A股' in summary}")
     
     # 从AI摘要中提取股票推荐信息
     extracted_stocks = extract_stock_recommendations_from_summary(summary)
+    print(f"🔍 提取到的股票推荐: {extracted_stocks}")
+    print(f"📊 热点板块股票数量: {len(extracted_stocks.get('hot_sector_stocks', []))}")
+    print(f"🔄 轮动机会股票数量: {len(extracted_stocks.get('rotation_stocks', []))}")
 
     # 生成市场情绪和时机分析部分
     sentiment_section = "## 📊 市场情绪概览\n"
@@ -1215,6 +1230,7 @@ if __name__ == "__main__":
     stock_recommendations = ""
     
     # 使用从AI摘要中提取的股票推荐
+    print(f"🔍 检查股票推荐条件: hot_sector_stocks={bool(extracted_stocks['hot_sector_stocks'])}, rotation_stocks={bool(extracted_stocks['rotation_stocks'])}")
     if extracted_stocks["hot_sector_stocks"] or extracted_stocks["rotation_stocks"]:
         stock_recommendations = "## 🎯 A股投资机会（仅限A股股票）\n\n"
         
