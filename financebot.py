@@ -1385,11 +1385,27 @@ if __name__ == "__main__":
     # 保留AI摘要的完整内容，不再移除具体股票推荐部分
     cleaned_summary = summary
     
-    # 生成仅展示标题和链接的最终消息
-    # 如果AI摘要中包含具体股票推荐，则不显示重复的stock_recommendations
-    if "## 🎯 具体股票推荐（仅限A股）" in cleaned_summary:
+    # 生成最终消息，避免重复的股票推荐
+    # 检查AI摘要中是否已经包含股票推荐部分
+    has_stock_recommendations_in_summary = (
+        "## 🎯 具体股票推荐" in cleaned_summary or 
+        "### 📈 热点板块股票" in cleaned_summary or 
+        "### 🔄 轮动机会股票" in cleaned_summary or
+        # 检查是否包含6位数字股票代码格式
+        bool(re.search(r'\b\d{6}\b', cleaned_summary))
+    )
+    
+    print(f"🔍 AI摘要中是否包含股票推荐: {has_stock_recommendations_in_summary}")
+    print(f"🔍 AI摘要中是否包含'具体股票推荐': {'具体股票推荐' in cleaned_summary}")
+    print(f"🔍 AI摘要中是否包含'热点板块股票': {'热点板块股票' in cleaned_summary}")
+    print(f"🔍 AI摘要中是否包含'轮动机会股票': {'轮动机会股票' in cleaned_summary}")
+    print(f"🔍 AI摘要中是否包含6位数字股票代码: {bool(re.search(r'\\b\\d{6}\\b', cleaned_summary))}")
+    
+    if has_stock_recommendations_in_summary:
+        # AI摘要中已包含股票推荐，不再添加重复内容
         final_summary = f"📅 **{today_str} 散户短线交易专用分析**\n\n{retail_analysis}{sentiment_section}{indices_section}{timing_section}{global_analysis}✍️ **今日分析总结：**\n{cleaned_summary}\n\n---\n\n"
     else:
+        # AI摘要中未包含股票推荐，添加单独生成的股票推荐
         final_summary = f"📅 **{today_str} 散户短线交易专用分析**\n\n{retail_analysis}{sentiment_section}{indices_section}{timing_section}{global_analysis}✍️ **今日分析总结：**\n{cleaned_summary}\n\n{stock_recommendations}---\n\n"
     for category, content in articles_data.items():
         # 跳过美国经济和世界经济部分，不显示英文内容
