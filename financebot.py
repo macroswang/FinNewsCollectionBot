@@ -344,6 +344,15 @@ except ImportError:
     print("⚠️ 实时数据模块未找到，将使用yfinance作为备用")
     REALTIME_DATA_AVAILABLE = False
 
+# 检查yfinance是否可用
+try:
+    import yfinance as yf
+    YFINANCE_AVAILABLE = True
+    print("✅ yfinance模块加载成功")
+except ImportError:
+    print("⚠️ yfinance模块未找到，将只使用实时数据")
+    YFINANCE_AVAILABLE = False
+
 # 获取实时股票数据（增强版）
 def get_real_time_stock_data(stock_code):
     """获取股票的实时数据（优先使用实时数据源，备用yfinance）"""
@@ -354,61 +363,82 @@ def get_real_time_stock_data(stock_code):
             realtime_data = realtime_data_client.get_realtime_data_multi_source(stock_code)
             
             if realtime_data and realtime_data.get("current_price", 0) > 0:
-                # 获取技术指标数据（使用yfinance）
-                try:
-                    # 转换A股代码格式（添加.SS或.SZ后缀）
-                    if stock_code.startswith('6'):
-                        ticker = f"{stock_code}.SS"  # 上海证券交易所
-                    else:
-                        ticker = f"{stock_code}.SZ"  # 深圳证券交易所
-                    
-                    stock = yf.Ticker(ticker)
-                    hist = stock.history(period="3mo")
-                    
-                    if not hist.empty:
-                        # 计算技术指标
-                        ma20 = hist['Close'].rolling(window=20).mean().iloc[-1]
-                        ma50 = hist['Close'].rolling(window=50).mean().iloc[-1]
-                        recent_high = hist['High'].tail(20).max()
-                        recent_low = hist['Low'].tail(20).min()
+                # 如果yfinance可用，尝试获取技术指标数据
+                if YFINANCE_AVAILABLE:
+                    try:
+                        # 转换A股代码格式（添加.SS或.SZ后缀）
+                        if stock_code.startswith('6'):
+                            ticker = f"{stock_code}.SS"  # 上海证券交易所
+                        else:
+                            ticker = f"{stock_code}.SZ"  # 深圳证券交易所
                         
-                        # 计算成交量变化
-                        avg_volume = hist['Volume'].tail(20).mean()
-                        current_volume = realtime_data.get("volume", 0)
-                        volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
+                        stock = yf.Ticker(ticker)
+                        hist = stock.history(period="3mo")
                         
-                        # 获取基本面信息
-                        try:
-                            info = stock.info
-                            pe_ratio = info.get('trailingPE', 'N/A')
-                            pb_ratio = info.get('priceToBook', 'N/A')
-                            market_cap = info.get('marketCap', 'N/A')
-                        except Exception as e:
-                            print(f"⚠️ 获取{stock_code}基本面数据失败: {e}")
-                            pe_ratio = 'N/A'
-                            pb_ratio = 'N/A'
-                            market_cap = 'N/A'
-                        
-                        result = {
-                            "current_price": realtime_data["current_price"],
-                            "price_change": realtime_data["price_change"],
-                            "volume_ratio": round(volume_ratio, 2),
-                            "ma20": round(ma20, 2),
-                            "ma50": round(ma50, 2),
-                            "recent_high": round(recent_high, 2),
-                            "recent_low": round(recent_low, 2),
-                            "pe_ratio": pe_ratio,
-                            "pb_ratio": pb_ratio,
-                            "market_cap": market_cap,
-                            "volume": realtime_data.get("volume", 0),
-                            "data_source": realtime_data.get("data_source", "实时数据"),
-                            "update_time": realtime_data.get("update_time", "未知")
-                        }
-                        
-                        print(f"✅ {stock_code} 实时数据获取成功: ¥{result['current_price']} ({result['price_change']}%) - {result['data_source']}")
-                        return result
-                    else:
-                        print(f"⚠️ {stock_code} 技术指标数据为空，使用纯实时数据")
+                        if not hist.empty:
+                            # 计算技术指标
+                            ma20 = hist['Close'].rolling(window=20).mean().iloc[-1]
+                            ma50 = hist['Close'].rolling(window=50).mean().iloc[-1]
+                            recent_high = hist['High'].tail(20).max()
+                            recent_low = hist['Low'].tail(20).min()
+                            
+                            # 计算成交量变化
+                            avg_volume = hist['Volume'].tail(20).mean()
+                            current_volume = realtime_data.get("volume", 0)
+                            volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
+                            
+                            # 获取基本面信息
+                            try:
+                                info = stock.info
+                                pe_ratio = info.get('trailingPE', 'N/A')
+                                pb_ratio = info.get('priceToBook', 'N/A')
+                                market_cap = info.get('marketCap', 'N/A')
+                            except Exception as e:
+                                print(f"⚠️ 获取{stock_code}基本面数据失败: {e}")
+                                pe_ratio = 'N/A'
+                                pb_ratio = 'N/A'
+                                market_cap = 'N/A'
+                            
+                            result = {
+                                "current_price": realtime_data["current_price"],
+                                "price_change": realtime_data["price_change"],
+                                "volume_ratio": round(volume_ratio, 2),
+                                "ma20": round(ma20, 2),
+                                "ma50": round(ma50, 2),
+                                "recent_high": round(recent_high, 2),
+                                "recent_low": round(recent_low, 2),
+                                "pe_ratio": pe_ratio,
+                                "pb_ratio": pb_ratio,
+                                "market_cap": market_cap,
+                                "volume": realtime_data.get("volume", 0),
+                                "data_source": realtime_data.get("data_source", "实时数据"),
+                                "update_time": realtime_data.get("update_time", "未知")
+                            }
+                            
+                            print(f"✅ {stock_code} 实时数据获取成功: ¥{result['current_price']} ({result['price_change']}%) - {result['data_source']}")
+                            return result
+                        else:
+                            print(f"⚠️ {stock_code} 技术指标数据为空，使用纯实时数据")
+                            # 返回纯实时数据
+                            result = {
+                                "current_price": realtime_data["current_price"],
+                                "price_change": realtime_data["price_change"],
+                                "volume_ratio": 1.0,
+                                "ma20": realtime_data["current_price"],
+                                "ma50": realtime_data["current_price"],
+                                "recent_high": realtime_data.get("high_price", realtime_data["current_price"]),
+                                "recent_low": realtime_data.get("low_price", realtime_data["current_price"]),
+                                "pe_ratio": 'N/A',
+                                "pb_ratio": 'N/A',
+                                "market_cap": 'N/A',
+                                "volume": realtime_data.get("volume", 0),
+                                "data_source": realtime_data.get("data_source", "实时数据"),
+                                "update_time": realtime_data.get("update_time", "未知")
+                            }
+                            return result
+                            
+                    except Exception as e:
+                        print(f"⚠️ 获取{stock_code}技术指标失败: {e}")
                         # 返回纯实时数据
                         result = {
                             "current_price": realtime_data["current_price"],
@@ -426,10 +456,9 @@ def get_real_time_stock_data(stock_code):
                             "update_time": realtime_data.get("update_time", "未知")
                         }
                         return result
-                        
-                except Exception as e:
-                    print(f"⚠️ 获取{stock_code}技术指标失败: {e}")
-                    # 返回纯实时数据
+                else:
+                    # yfinance不可用，只返回实时数据
+                    print(f"⚠️ yfinance不可用，使用纯实时数据")
                     result = {
                         "current_price": realtime_data["current_price"],
                         "price_change": realtime_data["price_change"],
@@ -447,75 +476,79 @@ def get_real_time_stock_data(stock_code):
                     }
                     return result
         
-        # 如果实时数据不可用，使用yfinance作为备用
-        print(f"🔍 使用yfinance获取 {stock_code} 数据...")
-        
-        # 转换A股代码格式（添加.SS或.SZ后缀）
-        if stock_code.startswith('6'):
-            ticker = f"{stock_code}.SS"  # 上海证券交易所
-        else:
-            ticker = f"{stock_code}.SZ"  # 深圳证券交易所
-        
-        # 获取股票信息
-        stock = yf.Ticker(ticker)
-        
-        # 获取历史数据用于技术分析
-        hist = stock.history(period="3mo")
-        
-        if hist.empty:
-            print(f"⚠️ {stock_code} 历史数据为空")
-            return None
+        # 如果实时数据不可用，尝试使用yfinance作为备用
+        if YFINANCE_AVAILABLE:
+            print(f"🔍 使用yfinance获取 {stock_code} 数据...")
             
-        # 计算技术指标
-        current_price = hist['Close'].iloc[-1]
-        prev_price = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
-        price_change = ((current_price - prev_price) / prev_price) * 100
-        
-        # 计算移动平均线
-        ma20 = hist['Close'].rolling(window=20).mean().iloc[-1]
-        ma50 = hist['Close'].rolling(window=50).mean().iloc[-1]
-        
-        # 计算支撑和阻力位
-        recent_high = hist['High'].tail(20).max()
-        recent_low = hist['Low'].tail(20).min()
-        
-        # 计算成交量变化
-        avg_volume = hist['Volume'].tail(20).mean()
-        current_volume = hist['Volume'].iloc[-1]
-        volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
-        
-        # 获取基本面信息（添加错误处理）
-        try:
-            info = stock.info
-            pe_ratio = info.get('trailingPE', 'N/A')
-            pb_ratio = info.get('priceToBook', 'N/A')
-            market_cap = info.get('marketCap', 'N/A')
-            volume = info.get('volume', 'N/A')
-        except Exception as e:
-            print(f"⚠️ 获取{stock_code}基本面数据失败: {e}")
-            pe_ratio = 'N/A'
-            pb_ratio = 'N/A'
-            market_cap = 'N/A'
-            volume = 'N/A'
-        
-        result = {
-            "current_price": round(current_price, 2),
-            "price_change": round(price_change, 2),
-            "volume_ratio": round(volume_ratio, 2),
-            "ma20": round(ma20, 2),
-            "ma50": round(ma50, 2),
-            "recent_high": round(recent_high, 2),
-            "recent_low": round(recent_low, 2),
-            "pe_ratio": pe_ratio,
-            "pb_ratio": pb_ratio,
-            "market_cap": market_cap,
-            "volume": volume,
-            "data_source": "yfinance(延迟数据)",
-            "update_time": "延迟数据"
-        }
-        
-        print(f"✅ {stock_code} yfinance数据获取成功: ¥{result['current_price']} ({result['price_change']}%)")
-        return result
+            # 转换A股代码格式（添加.SS或.SZ后缀）
+            if stock_code.startswith('6'):
+                ticker = f"{stock_code}.SS"  # 上海证券交易所
+            else:
+                ticker = f"{stock_code}.SZ"  # 深圳证券交易所
+            
+            # 获取股票信息
+            stock = yf.Ticker(ticker)
+            
+            # 获取历史数据用于技术分析
+            hist = stock.history(period="3mo")
+            
+            if hist.empty:
+                print(f"⚠️ {stock_code} 历史数据为空")
+                return None
+                
+            # 计算技术指标
+            current_price = hist['Close'].iloc[-1]
+            prev_price = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
+            price_change = ((current_price - prev_price) / prev_price) * 100
+            
+            # 计算移动平均线
+            ma20 = hist['Close'].rolling(window=20).mean().iloc[-1]
+            ma50 = hist['Close'].rolling(window=50).mean().iloc[-1]
+            
+            # 计算支撑和阻力位
+            recent_high = hist['High'].tail(20).max()
+            recent_low = hist['Low'].tail(20).min()
+            
+            # 计算成交量变化
+            avg_volume = hist['Volume'].tail(20).mean()
+            current_volume = hist['Volume'].iloc[-1]
+            volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
+            
+            # 获取基本面信息（添加错误处理）
+            try:
+                info = stock.info
+                pe_ratio = info.get('trailingPE', 'N/A')
+                pb_ratio = info.get('priceToBook', 'N/A')
+                market_cap = info.get('marketCap', 'N/A')
+                volume = info.get('volume', 'N/A')
+            except Exception as e:
+                print(f"⚠️ 获取{stock_code}基本面数据失败: {e}")
+                pe_ratio = 'N/A'
+                pb_ratio = 'N/A'
+                market_cap = 'N/A'
+                volume = 'N/A'
+            
+            result = {
+                "current_price": round(current_price, 2),
+                "price_change": round(price_change, 2),
+                "volume_ratio": round(volume_ratio, 2),
+                "ma20": round(ma20, 2),
+                "ma50": round(ma50, 2),
+                "recent_high": round(recent_high, 2),
+                "recent_low": round(recent_low, 2),
+                "pe_ratio": pe_ratio,
+                "pb_ratio": pb_ratio,
+                "market_cap": market_cap,
+                "volume": volume,
+                "data_source": "yfinance(延迟数据)",
+                "update_time": "延迟数据"
+            }
+            
+            print(f"✅ {stock_code} yfinance数据获取成功: ¥{result['current_price']} ({result['price_change']}%)")
+            return result
+        else:
+            print(f"❌ 实时数据和yfinance都不可用")
+            return None
         
     except Exception as e:
         print(f"❌ 获取{stock_code}实时数据失败: {e}")
