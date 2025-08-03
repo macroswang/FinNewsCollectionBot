@@ -12,6 +12,7 @@ import re
 import yfinance as yf
 import pandas as pd
 import numpy as np
+import signal
 
 # OpenAI API Key
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -68,14 +69,32 @@ def today_date():
 # 爬取网页正文 (用于 AI 分析，但不展示)
 def fetch_article_text(url):
     try:
-        print(f"📰 正在爬取文章内容: {url}")
-        article = Article(url)
-        article.download()
-        article.parse()
-        text = article.text[:1500]  # 限制长度，防止超出 API 输入限制
-        if not text:
-            print(f"⚠️ 文章内容为空: {url}")
-        return text
+        print(f"�� 正在爬取文章内容: {url}")
+        
+        # 设置超时控制
+        def timeout_handler(signum, frame):
+            raise TimeoutError(f"爬取文章超时: {url}")
+        
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(20)  # 20秒超时
+        
+        try:
+            article = Article(url)
+            article.download()
+            article.parse()
+            text = article.text[:1500]  # 限制长度，防止超出 API 输入限制
+            signal.alarm(0)  # 取消超时
+            
+            if not text:
+                print(f"⚠️ 文章内容为空: {url}")
+            return text
+        except TimeoutError:
+            print(f"⚠️ 爬取文章超时: {url}")
+            signal.alarm(0)
+            return "（文章爬取超时）"
+        finally:
+            signal.alarm(0)  # 确保取消超时
+            
     except Exception as e:
         print(f"❌ 文章爬取失败: {url}，错误: {e}")
         return "（未能获取文章正文）"
@@ -85,19 +104,41 @@ def fetch_feed_with_headers(url):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
-    return feedparser.parse(url, request_headers=headers)
-
+    
+    # 设置超时控制
+    def timeout_handler(signum, frame):
+        raise TimeoutError(f"RSS获取超时: {url}")
+    
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(15)  # 15秒超时
+    
+    try:
+        feed = feedparser.parse(url, request_headers=headers)
+        signal.alarm(0)  # 取消超时
+        return feed
+    except TimeoutError:
+        print(f"⚠️ RSS获取超时: {url}")
+        signal.alarm(0)
+        return None
+    except Exception as e:
+        print(f"⚠️ RSS获取失败: {url}, 错误: {e}")
+        signal.alarm(0)
+        return None
+    finally:
+        signal.alarm(0)  # 确保取消超时
 
 # 自动重试获取 RSS
-def fetch_feed_with_retry(url, retries=3, delay=5):
+def fetch_feed_with_retry(url, retries=2, delay=3):
     for i in range(retries):
         try:
+            print(f"📡 第 {i+1} 次尝试获取 RSS: {url}")
             feed = fetch_feed_with_headers(url)
             if feed and hasattr(feed, 'entries') and len(feed.entries) > 0:
                 return feed
         except Exception as e:
             print(f"⚠️ 第 {i+1} 次请求 {url} 失败: {e}")
-            time.sleep(delay)
+            if i < retries - 1:  # 不是最后一次重试
+                time.sleep(delay)
     print(f"❌ 跳过 {url}, 尝试 {retries} 次后仍失败。")
     return None
 
@@ -150,95 +191,120 @@ def summarize(text, global_events=None):
         {chr(10).join([f"- {event['事件']}: {event['逻辑']} -> 影响{event['影响行业']} -> 国内映射{event['国内映射']}" for event in global_events])}
         """
         
-        completion = openai_client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[
-                {"role": "system", "content": """
-                 你是一名专业的短线交易分析师，专门为散户投资者提供短线交易建议。请根据以下新闻内容，按照以下步骤进行分析：
+        # 设置超时控制
+        def timeout_handler(signum, frame):
+            raise TimeoutError("AI分析超时")
+        
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(60)  # 60秒超时
+        
+        try:
+            completion = openai_client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[
+                    {"role": "system", "content": """
+                     你是一名专业的短线交易分析师，专门为散户投资者提供短线交易建议。请根据以下新闻内容，按照以下步骤进行分析：
 
-                 **短线交易分析框架：**
-                 
-                 1. **热点识别与预见性分析**：
-                    - 识别未来1-3天可能爆发的热点板块
-                    - 分析哪些行业/概念有短期催化剂（政策、事件、数据发布等）
-                    - 找出资金流向和情绪变化信号
-                 
-                 2. **短线机会挖掘**：
-                    - 找出近期涨幅较小但基本面改善的板块
-                    - 识别超跌反弹机会
-                    - 分析板块轮动规律，预判下一个轮动方向
-                 
-                 3. **风险控制建议**：
-                    - 识别短期风险事件和利空因素
-                    - 分析市场情绪拐点
-                    - 提供仓位控制建议
-                 
-                 4. **短线交易策略**：
-                    - 建议买入时机和价格区间
-                    - 设置合理的止盈止损位（止盈≤10%，止损≤-3%）
-                    - 提供持仓时间建议（1-5个交易日）
-                    - 分析快进快出的最佳时机
-                 
-                 5. **资金管理**：
-                    - 建议单笔投资金额比例
-                    - 提供分散投资建议
-                    - 分析资金使用效率
-                 
-                 **输出格式要求：**
-                 
-                 ## 🎯 短线交易机会
-                 
-                 ### 📈 热点板块（1-3天爆发预期）
-                 - 板块名称：具体推荐理由
-                 - 催化剂：触发因素和时间
-                 - 目标涨幅：预期收益
-                 - 风险提示：需要注意的风险
-                 
-                 ### 🔄 轮动机会（超跌反弹）
-                 - 板块名称：反弹逻辑
-                 - 技术面：支撑位和阻力位
-                 - 买入时机：具体建议
-                 - 止盈止损：价格区间
-                 
-                 ## 🎯 具体股票推荐
-                 
-                 ### 📈 热点板块股票
-                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
-                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
-                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
-                 
-                 ### 🔄 轮动机会股票
-                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
-                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
-                 - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
-                 
-                 ## ⚠️ 风险提示
-                 - 短期利空因素
-                 - 需要规避的板块
-                 - 市场情绪变化信号
-                 
-                 ## 💰 资金配置建议
-                 - 总仓位建议
-                 - 单笔投资比例
-                 - 分散投资策略
-                 
-                 ## 📊 操作策略
-                 - 买入时机：具体时间窗口
-                 - 卖出策略：分批止盈建议
-                 - 风险控制：止损执行要点
-                 
-                 注意：
-                 - 重点关注1-5个交易日的短线机会
-                 - 提供具体的价格区间和操作建议
-                 - 强调风险控制和资金管理
-                 - 避免过度乐观，保持理性分析
-                 - 推荐股票要结合新闻热点，优先选择中小盘股票（市值100-500亿）
-                 - 避免推荐超大市值股票（如茅台、宁德时代等）
-                 """},
-                {"role": "user", "content": f"新闻内容：{text}\n\n{global_context}"}
-            ]
-        )
-        return completion.choices[0].message.content.strip()
+                     **短线交易分析框架：**
+                     
+                     1. **热点识别与预见性分析**：
+                        - 识别未来1-3天可能爆发的热点板块
+                        - 分析哪些行业/概念有短期催化剂（政策、事件、数据发布等）
+                        - 找出资金流向和情绪变化信号
+                     
+                     2. **短线机会挖掘**：
+                        - 找出近期涨幅较小但基本面改善的板块
+                        - 识别超跌反弹机会
+                        - 分析板块轮动规律，预判下一个轮动方向
+                     
+                     3. **风险控制建议**：
+                        - 识别短期风险事件和利空因素
+                        - 分析市场情绪拐点
+                        - 提供仓位控制建议
+                     
+                     4. **短线交易策略**：
+                        - 建议买入时机和价格区间
+                        - 设置合理的止盈止损位（止盈≤10%，止损≤-3%）
+                        - 提供持仓时间建议（1-5个交易日）
+                        - 分析快进快出的最佳时机
+                     
+                     5. **资金管理**：
+                        - 建议单笔投资金额比例
+                        - 提供分散投资建议
+                        - 分析资金使用效率
+                     
+                     **输出格式要求：**
+                     
+                     ## 🎯 短线交易机会
+                     
+                     ### 📈 热点板块（1-3天爆发预期）
+                     - 板块名称：具体推荐理由
+                     - 催化剂：触发因素和时间
+                     - 目标涨幅：预期收益
+                     - 风险提示：需要注意的风险
+                     
+                     ### 🔄 轮动机会（超跌反弹）
+                     - 板块名称：反弹逻辑
+                     - 技术面：支撑位和阻力位
+                     - 买入时机：具体建议
+                     - 止盈止损：价格区间
+                     
+                     ## 🎯 具体股票推荐
+                     
+                     ### 📈 热点板块股票
+                     - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                     - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                     - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                     
+                     ### 🔄 轮动机会股票
+                     - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                     - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                     - 股票代码 股票名称：推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略
+                     
+                     ## ⚠️ 风险提示
+                     - 短期利空因素
+                     - 需要规避的板块
+                     - 市场情绪变化信号
+                     
+                     ## 💰 资金配置建议
+                     - 总仓位建议
+                     - 单笔投资比例
+                     - 分散投资策略
+                     
+                     ## 📊 操作策略
+                     - 买入时机：具体时间窗口
+                     - 卖出策略：分批止盈建议
+                     - 风险控制：止损执行要点
+                     
+                     注意：
+                     - 重点关注1-5个交易日的短线机会
+                     - 提供具体的价格区间和操作建议
+                     - 强调风险控制和资金管理
+                     - 避免过度乐观，保持理性分析
+                     - 推荐股票要结合新闻热点，优先选择中小盘股票（市值100-500亿）
+                     - 避免推荐超大市值股票（如茅台、宁德时代等）
+                     """},
+                    {"role": "user", "content": f"新闻内容：{text}\n\n{global_context}"}
+                ],
+                timeout=45  # 45秒超时
+            )
+            signal.alarm(0)  # 取消超时
+            return completion.choices[0].message.content.strip()
+        except TimeoutError:
+            print("⚠️ AI分析超时，返回简单摘要")
+            signal.alarm(0)
+            return f"""
+📊 今日财经新闻摘要
+
+由于AI分析服务暂时不可用，以下是今日收集的主要财经新闻：
+
+{text[:1000]}...
+
+请关注以上新闻对市场的影响。
+            """
+        finally:
+            signal.alarm(0)  # 确保取消超时
+            
     except Exception as e:
         print(f"⚠️ AI 分析失败: {e}")
         # 如果 AI 分析失败，返回简单的新闻摘要
@@ -312,16 +378,33 @@ def get_market_indices():
         market_data = {}
         for name, code in indices.items():
             try:
-                stock = yf.Ticker(code)
-                hist = stock.history(period="1d")
-                if not hist.empty:
-                    current_price = hist['Close'].iloc[-1]
-                    prev_close = hist['Open'].iloc[-1]
-                    change = ((current_price - prev_close) / prev_close) * 100
-                    change_emoji = "📈" if change > 0 else "📉" if change < 0 else "➡️"
-                    market_data[name] = f"{change_emoji} {current_price:.2f} ({change:+.2f}%)"
-                else:
-                    market_data[name] = "📊 数据获取中"
+                # 设置超时控制
+                def timeout_handler(signum, frame):
+                    raise TimeoutError(f"获取{name}数据超时")
+                
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(15)  # 15秒超时
+                
+                try:
+                    stock = yf.Ticker(code)
+                    hist = stock.history(period="1d", timeout=10)  # 10秒超时
+                    signal.alarm(0)  # 取消超时
+                    
+                    if not hist.empty:
+                        current_price = hist['Close'].iloc[-1]
+                        prev_close = hist['Open'].iloc[-1]
+                        change = ((current_price - prev_close) / prev_close) * 100
+                        change_emoji = "📈" if change > 0 else "📉" if change < 0 else "➡️"
+                        market_data[name] = f"{change_emoji} {current_price:.2f} ({change:+.2f}%)"
+                    else:
+                        market_data[name] = "📊 数据获取中"
+                except TimeoutError:
+                    print(f"⚠️ 获取{name}数据超时")
+                    signal.alarm(0)
+                    market_data[name] = "❌ 数据获取超时"
+                finally:
+                    signal.alarm(0)  # 确保取消超时
+                    
             except Exception as e:
                 print(f"⚠️ 获取{name}数据失败: {e}")
                 market_data[name] = "❌ 数据获取失败"
@@ -350,159 +433,180 @@ def get_real_time_stock_data(stock_code):
         # 获取股票信息
         stock = yf.Ticker(ticker)
         
-        # 获取历史数据用于技术分析（增加数据量）
-        hist = stock.history(period="6mo")
+        # 设置超时时间，防止无限等待
+        def timeout_handler(signum, frame):
+            raise TimeoutError(f"获取{stock_code}数据超时")
         
-        if hist.empty:
-            print(f"⚠️ {stock_code} 历史数据为空")
-            return None
-            
-        # 计算技术指标
-        current_price = hist['Close'].iloc[-1]
-        prev_price = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
-        price_change = ((current_price - prev_price) / prev_price) * 100
+        # 设置30秒超时
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(30)
         
-        # 计算移动平均线
-        ma5 = hist['Close'].rolling(window=5).mean().iloc[-1]
-        ma10 = hist['Close'].rolling(window=10).mean().iloc[-1]
-        ma20 = hist['Close'].rolling(window=20).mean().iloc[-1]
-        ma50 = hist['Close'].rolling(window=50).mean().iloc[-1]
-        
-        # 计算支撑和阻力位
-        recent_high = hist['High'].tail(20).max()
-        recent_low = hist['Low'].tail(20).min()
-        
-        # 计算布林带
-        bb_period = 20
-        bb_std = 2
-        bb_middle = hist['Close'].rolling(window=bb_period).mean()
-        bb_std_dev = hist['Close'].rolling(window=bb_period).std()
-        bb_upper = bb_middle + (bb_std_dev * bb_std)
-        bb_lower = bb_middle - (bb_std_dev * bb_std)
-        
-        current_bb_upper = bb_upper.iloc[-1]
-        current_bb_lower = bb_lower.iloc[-1]
-        
-        # 计算RSI
-        delta = hist['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        rs = gain / loss
-        rsi = 100 - (100 / (1 + rs))
-        current_rsi = rsi.iloc[-1]
-        
-        # 计算成交量变化
-        avg_volume = hist['Volume'].tail(20).mean()
-        current_volume = hist['Volume'].iloc[-1]
-        volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
-        
-        # 计算MACD
-        exp1 = hist['Close'].ewm(span=12, adjust=False).mean()
-        exp2 = hist['Close'].ewm(span=26, adjust=False).mean()
-        macd = exp1 - exp2
-        signal = macd.ewm(span=9, adjust=False).mean()
-        current_macd = macd.iloc[-1]
-        current_signal = signal.iloc[-1]
-        
-        # 获取基本面信息
         try:
-            info = stock.info
-            pe_ratio = info.get('trailingPE', 'N/A')
-            pb_ratio = info.get('priceToBook', 'N/A')
-            market_cap = info.get('marketCap', 'N/A')
-            volume = info.get('volume', 'N/A')
-        except Exception as e:
-            print(f"⚠️ 获取{stock_code}基本面数据失败: {e}")
-            pe_ratio = 'N/A'
-            pb_ratio = 'N/A'
-            market_cap = 'N/A'
-            volume = 'N/A'
-        
-        # 计算买卖点
-        # 支撑位：近期低点、布林带下轨、MA20的较低值
-        support_levels = [
-            recent_low,
-            current_bb_lower,
-            ma20 * 0.98  # MA20下方2%
-        ]
-        primary_support = max([s for s in support_levels if s < current_price], default=recent_low)
-        secondary_support = primary_support * 0.95  # 第二支撑位
-        
-        # 阻力位：近期高点、布林带上轨、MA20上方
-        resistance_levels = [
-            recent_high,
-            current_bb_upper,
-            ma20 * 1.05  # MA20上方5%
-        ]
-        primary_resistance = min([r for r in resistance_levels if r > current_price], default=recent_high)
-        secondary_resistance = primary_resistance * 1.05  # 第二阻力位
-        
-        # 计算建议买入价和卖出价
-        buy_price = primary_support * 1.02  # 支撑位上方2%
-        sell_price = primary_resistance * 0.98  # 阻力位下方2%
-        
-        # 计算止损价
-        stop_loss = primary_support * 0.95  # 支撑位下方5%
-        
-        # 技术面分析
-        technical_signals = []
-        if current_price > ma20 and ma20 > ma50:
-            technical_signals.append("多头排列")
-        elif current_price < ma20 and ma20 < ma50:
-            technical_signals.append("空头排列")
-        
-        if current_rsi < 30:
-            technical_signals.append("超卖")
-        elif current_rsi > 70:
-            technical_signals.append("超买")
-        
-        if current_macd > current_signal:
-            technical_signals.append("MACD金叉")
-        elif current_macd < current_signal:
-            technical_signals.append("MACD死叉")
-        
-        if volume_ratio > 1.5:
-            technical_signals.append("放量")
-        elif volume_ratio < 0.5:
-            technical_signals.append("缩量")
-        
-        result = {
-            "current_price": round(current_price, 2),
-            "price_change": round(price_change, 2),
-            "volume_ratio": round(volume_ratio, 2),
-            "ma5": round(ma5, 2),
-            "ma10": round(ma10, 2),
-            "ma20": round(ma20, 2),
-            "ma50": round(ma50, 2),
-            "recent_high": round(recent_high, 2),
-            "recent_low": round(recent_low, 2),
-            "bb_upper": round(current_bb_upper, 2),
-            "bb_lower": round(current_bb_lower, 2),
-            "rsi": round(current_rsi, 2),
-            "macd": round(current_macd, 2),
-            "signal": round(current_signal, 2),
-            "pe_ratio": pe_ratio,
-            "pb_ratio": pb_ratio,
-            "market_cap": market_cap,
-            "volume": volume,
-            "support_levels": {
-                "primary": round(primary_support, 2),
-                "secondary": round(secondary_support, 2)
-            },
-            "resistance_levels": {
-                "primary": round(primary_resistance, 2),
-                "secondary": round(secondary_resistance, 2)
-            },
-            "trading_points": {
-                "buy_price": round(buy_price, 2),
-                "sell_price": round(sell_price, 2),
-                "stop_loss": round(stop_loss, 2)
-            },
-            "technical_signals": technical_signals
-        }
-        
-        print(f"✅ {stock_code} 实时数据获取成功: ¥{result['current_price']} ({result['price_change']}%)")
-        return result
+            # 获取历史数据用于技术分析（增加数据量）
+            hist = stock.history(period="6mo", timeout=20)  # 添加20秒超时
+            
+            # 取消超时
+            signal.alarm(0)
+            
+            if hist.empty:
+                print(f"⚠️ {stock_code} 历史数据为空")
+                return None
+                
+            # 计算技术指标
+            current_price = hist['Close'].iloc[-1]
+            prev_price = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
+            price_change = ((current_price - prev_price) / prev_price) * 100
+            
+            # 计算移动平均线
+            ma5 = hist['Close'].rolling(window=5).mean().iloc[-1]
+            ma10 = hist['Close'].rolling(window=10).mean().iloc[-1]
+            ma20 = hist['Close'].rolling(window=20).mean().iloc[-1]
+            ma50 = hist['Close'].rolling(window=50).mean().iloc[-1]
+            
+            # 计算支撑和阻力位
+            recent_high = hist['High'].tail(20).max()
+            recent_low = hist['Low'].tail(20).min()
+            
+            # 计算布林带
+            bb_period = 20
+            bb_std = 2
+            bb_middle = hist['Close'].rolling(window=bb_period).mean()
+            bb_std_dev = hist['Close'].rolling(window=bb_period).std()
+            bb_upper = bb_middle + (bb_std_dev * bb_std)
+            bb_lower = bb_middle - (bb_std_dev * bb_std)
+            
+            current_bb_upper = bb_upper.iloc[-1]
+            current_bb_lower = bb_lower.iloc[-1]
+            
+            # 计算RSI
+            delta = hist['Close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            rsi = 100 - (100 / (1 + rs))
+            current_rsi = rsi.iloc[-1]
+            
+            # 计算成交量变化
+            avg_volume = hist['Volume'].tail(20).mean()
+            current_volume = hist['Volume'].iloc[-1]
+            volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
+            
+            # 计算MACD
+            exp1 = hist['Close'].ewm(span=12, adjust=False).mean()
+            exp2 = hist['Close'].ewm(span=26, adjust=False).mean()
+            macd = exp1 - exp2
+            signal = macd.ewm(span=9, adjust=False).mean()
+            current_macd = macd.iloc[-1]
+            current_signal = signal.iloc[-1]
+            
+            # 获取基本面信息（添加超时控制）
+            try:
+                signal.alarm(15)  # 15秒超时获取基本面数据
+                info = stock.info
+                signal.alarm(0)
+                
+                pe_ratio = info.get('trailingPE', 'N/A')
+                pb_ratio = info.get('priceToBook', 'N/A')
+                market_cap = info.get('marketCap', 'N/A')
+                volume = info.get('volume', 'N/A')
+            except (TimeoutError, Exception) as e:
+                print(f"⚠️ 获取{stock_code}基本面数据失败: {e}")
+                pe_ratio = 'N/A'
+                pb_ratio = 'N/A'
+                market_cap = 'N/A'
+                volume = 'N/A'
+            
+            # 计算买卖点
+            # 支撑位：近期低点、布林带下轨、MA20的较低值
+            support_levels = [
+                recent_low,
+                current_bb_lower,
+                ma20 * 0.98  # MA20下方2%
+            ]
+            primary_support = max([s for s in support_levels if s < current_price], default=recent_low)
+            secondary_support = primary_support * 0.95  # 第二支撑位
+            
+            # 阻力位：近期高点、布林带上轨、MA20上方
+            resistance_levels = [
+                recent_high,
+                current_bb_upper,
+                ma20 * 1.05  # MA20上方5%
+            ]
+            primary_resistance = min([r for r in resistance_levels if r > current_price], default=recent_high)
+            secondary_resistance = primary_resistance * 1.05  # 第二阻力位
+            
+            # 计算建议买入价和卖出价
+            buy_price = primary_support * 1.02  # 支撑位上方2%
+            sell_price = primary_resistance * 0.98  # 阻力位下方2%
+            
+            # 计算止损价
+            stop_loss = primary_support * 0.95  # 支撑位下方5%
+            
+            # 技术面分析
+            technical_signals = []
+            if current_price > ma20 and ma20 > ma50:
+                technical_signals.append("多头排列")
+            elif current_price < ma20 and ma20 < ma50:
+                technical_signals.append("空头排列")
+            
+            if current_rsi < 30:
+                technical_signals.append("超卖")
+            elif current_rsi > 70:
+                technical_signals.append("超买")
+            
+            if current_macd > current_signal:
+                technical_signals.append("MACD金叉")
+            elif current_macd < current_signal:
+                technical_signals.append("MACD死叉")
+            
+            if volume_ratio > 1.5:
+                technical_signals.append("放量")
+            elif volume_ratio < 0.5:
+                technical_signals.append("缩量")
+            
+            result = {
+                "current_price": round(current_price, 2),
+                "price_change": round(price_change, 2),
+                "volume_ratio": round(volume_ratio, 2),
+                "ma5": round(ma5, 2),
+                "ma10": round(ma10, 2),
+                "ma20": round(ma20, 2),
+                "ma50": round(ma50, 2),
+                "recent_high": round(recent_high, 2),
+                "recent_low": round(recent_low, 2),
+                "bb_upper": round(current_bb_upper, 2),
+                "bb_lower": round(current_bb_lower, 2),
+                "rsi": round(current_rsi, 2),
+                "macd": round(current_macd, 2),
+                "signal": round(current_signal, 2),
+                "pe_ratio": pe_ratio,
+                "pb_ratio": pb_ratio,
+                "market_cap": market_cap,
+                "volume": volume,
+                "support_levels": {
+                    "primary": round(primary_support, 2),
+                    "secondary": round(secondary_support, 2)
+                },
+                "resistance_levels": {
+                    "primary": round(primary_resistance, 2),
+                    "secondary": round(secondary_resistance, 2)
+                },
+                "trading_points": {
+                    "buy_price": round(buy_price, 2),
+                    "sell_price": round(sell_price, 2),
+                    "stop_loss": round(stop_loss, 2)
+                },
+                "technical_signals": technical_signals
+            }
+            
+            print(f"✅ {stock_code} 实时数据获取成功: ¥{result['current_price']} ({result['price_change']}%)")
+            return result
+            
+        except TimeoutError as e:
+            print(f"❌ {stock_code} 数据获取超时: {e}")
+            return None
+        finally:
+            signal.alarm(0)  # 确保取消超时
         
     except Exception as e:
         print(f"❌ 获取{stock_code}实时数据失败: {e}")
@@ -518,79 +622,95 @@ def get_stock_industry(stock_code):
         else:
             ticker = f"{stock_code}.SZ"
         
-        stock = yf.Ticker(ticker)
-        info = stock.info
+        # 设置超时控制
+        def timeout_handler(signum, frame):
+            raise TimeoutError(f"获取{stock_code}行业分类超时")
         
-        # 获取行业信息
-        sector = info.get('sector', '')
-        industry = info.get('industry', '')
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(10)  # 10秒超时
         
-        # 映射到中文行业分类
-        industry_mapping = {
-            # 科技相关
-            'Technology': '科技',
-            'Semiconductors': '半导体',
-            'Software': '软件',
-            'Hardware': '硬件',
-            'Consumer Electronics': '消费电子',
-            'Electronic Components': '科技',
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info
+            signal.alarm(0)  # 取消超时
             
-            # 新能源相关
-            'Energy': '能源',
-            'Renewable Energy': '新能源',
-            'Utilities': '公用事业',
-            'Electric Utilities': '电力',
-            'Utilities - Renewable': '新能源',
-            'Electrical Equipment & Parts': '新能源',
+            # 获取行业信息
+            sector = info.get('sector', '')
+            industry = info.get('industry', '')
             
-            # 医药相关
-            'Healthcare': '医药',
-            'Biotechnology': '生物科技',
-            'Pharmaceuticals': '制药',
-            'Medical Devices': '医药',  # 医疗器械也归类为医药
-            'Medical Care Facilities': '医药',
-            'Diagnostics & Research': '医药',
+            # 映射到中文行业分类
+            industry_mapping = {
+                # 科技相关
+                'Technology': '科技',
+                'Semiconductors': '半导体',
+                'Software': '软件',
+                'Hardware': '硬件',
+                'Consumer Electronics': '消费电子',
+                'Electronic Components': '科技',
+                
+                # 新能源相关
+                'Energy': '能源',
+                'Renewable Energy': '新能源',
+                'Utilities': '公用事业',
+                'Electric Utilities': '电力',
+                'Utilities - Renewable': '新能源',
+                'Electrical Equipment & Parts': '新能源',
+                
+                # 医药相关
+                'Healthcare': '医药',
+                'Biotechnology': '生物科技',
+                'Pharmaceuticals': '制药',
+                'Medical Devices': '医药',  # 医疗器械也归类为医药
+                'Medical Care Facilities': '医药',
+                'Diagnostics & Research': '医药',
+                
+                # 消费相关
+                'Consumer Defensive': '消费',
+                'Consumer Cyclical': '消费',
+                'Food & Beverage': '食品饮料',
+                'Retail': '零售',
+                'Beverages - Wineries & Distilleries': '消费',
+                'Auto Manufacturers': '新能源',  # 比亚迪等新能源汽车制造商
+                
+                # 金融相关
+                'Financial Services': '银行',  # 金融服务归类为银行
+                'Banks': '银行',
+                'Banks - Regional': '银行',
+                'Insurance': '保险',
+                
+                # 工业相关
+                'Industrials': '工业',
+                'Manufacturing': '制造',
+                'Construction': '基建',
+                'Engineering & Construction': '基建',
+                
+                # 材料相关
+                'Basic Materials': '材料',
+                'Chemicals': '化工',
+                'Specialty Chemicals': '化工',
+                'Metals & Mining': '金属矿业',
+                
+                # 其他
+                'Real Estate': '房地产',
+                'Communication Services': '通信',
+                'Transportation': '运输'
+            }
             
-            # 消费相关
-            'Consumer Defensive': '消费',
-            'Consumer Cyclical': '消费',
-            'Food & Beverage': '食品饮料',
-            'Retail': '零售',
-            'Beverages - Wineries & Distilleries': '消费',
-            'Auto Manufacturers': '新能源',  # 比亚迪等新能源汽车制造商
+            # 优先使用industry，如果没有则使用sector
+            mapped_industry = industry_mapping.get(industry, industry_mapping.get(sector, ''))
             
-            # 金融相关
-            'Financial Services': '银行',  # 金融服务归类为银行
-            'Banks': '银行',
-            'Banks - Regional': '银行',
-            'Insurance': '保险',
-            
-            # 工业相关
-            'Industrials': '工业',
-            'Manufacturing': '制造',
-            'Construction': '基建',
-            'Engineering & Construction': '基建',
-            
-            # 材料相关
-            'Basic Materials': '材料',
-            'Chemicals': '化工',
-            'Specialty Chemicals': '化工',
-            'Metals & Mining': '金属矿业',
-            
-            # 其他
-            'Real Estate': '房地产',
-            'Communication Services': '通信',
-            'Transportation': '运输'
-        }
-        
-        # 优先使用industry，如果没有则使用sector
-        mapped_industry = industry_mapping.get(industry, industry_mapping.get(sector, ''))
-        
-        if mapped_industry:
-            return mapped_industry
-        else:
-            # 如果无法获取，使用备用分类
+            if mapped_industry:
+                return mapped_industry
+            else:
+                # 如果无法获取，使用备用分类
+                return get_fallback_industry(stock_code)
+                
+        except TimeoutError:
+            print(f"⚠️ 获取{stock_code}行业分类超时")
+            signal.alarm(0)
             return get_fallback_industry(stock_code)
+        finally:
+            signal.alarm(0)  # 确保取消超时
             
     except Exception as e:
         print(f"⚠️ 获取{stock_code}行业分类失败: {e}")
@@ -642,73 +762,90 @@ def get_specific_stock_recommendations(industry, news_summary):
         6. 重点关注1-5个交易日的短线机会
         """
 
-        completion = openai_client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[
-                {"role": "system", "content": f"你是一个专业的短线交易分析师，请基于{industry}行业分析推荐适合短线交易的股票，提供具体的操作策略。"},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.3
-        )
+        # 设置超时控制
+        def timeout_handler(signum, frame):
+            raise TimeoutError("股票推荐AI分析超时")
         
-        response_text = completion.choices[0].message.content.strip()
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(30)  # 30秒超时
         
         try:
-            import json
-            result = json.loads(response_text)
-            stocks = result.get("stocks", [])
+            completion = openai_client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[
+                    {"role": "system", "content": f"你是一个专业的短线交易分析师，请基于{industry}行业分析推荐适合短线交易的股票，提供具体的操作策略。"},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                timeout=25  # 25秒超时
+            )
+            signal.alarm(0)  # 取消超时
             
-            # 验证股票行业分类并获取实时数据
-            verified_stocks = []
-            for stock in stocks:
-                if verify_stock_industry(stock["code"], industry):
-                    # 获取实时数据
-                    real_time_data = get_real_time_stock_data(stock["code"])
-                    if real_time_data:
-                        # 合并实时数据到股票推荐中
-                        stock.update({
-                            "real_time_data": real_time_data,
-                            "current_price": real_time_data["current_price"],
-                            "price_change": real_time_data["price_change"],
-                            "technical_analysis": {
-                                "ma20": real_time_data["ma20"],
-                                "rsi": real_time_data["rsi"],
-                                "volume_ratio": real_time_data["volume_ratio"],
-                                "signals": real_time_data["technical_signals"]
-                            },
-                            "trading_points": real_time_data["trading_points"],
-                            "support_resistance": {
-                                "support": real_time_data["support_levels"],
-                                "resistance": real_time_data["resistance_levels"]
-                            }
-                        })
-                        
-                        # 更新买卖策略为具体价格
-                        stock["entry_strategy"] = f"建议买入价：¥{real_time_data['trading_points']['buy_price']}，支撑位：¥{real_time_data['support_levels']['primary']}"
-                        stock["exit_strategy"] = f"建议卖出价：¥{real_time_data['trading_points']['sell_price']}，阻力位：¥{real_time_data['resistance_levels']['primary']}"
-                        stock["stop_loss"] = f"止损价：¥{real_time_data['trading_points']['stop_loss']}"
-                        
-                        verified_stocks.append(stock)
-                        print(f"✅ {stock['code']} {stock['name']} 验证为{industry}行业，实时价格：¥{real_time_data['current_price']}")
+            response_text = completion.choices[0].message.content.strip()
+            
+            try:
+                import json
+                result = json.loads(response_text)
+                stocks = result.get("stocks", [])
+                
+                # 验证股票行业分类并获取实时数据
+                verified_stocks = []
+                for stock in stocks:
+                    if verify_stock_industry(stock["code"], industry):
+                        # 获取实时数据
+                        real_time_data = get_real_time_stock_data(stock["code"])
+                        if real_time_data:
+                            # 合并实时数据到股票推荐中
+                            stock.update({
+                                "real_time_data": real_time_data,
+                                "current_price": real_time_data["current_price"],
+                                "price_change": real_time_data["price_change"],
+                                "technical_analysis": {
+                                    "ma20": real_time_data["ma20"],
+                                    "rsi": real_time_data["rsi"],
+                                    "volume_ratio": real_time_data["volume_ratio"],
+                                    "signals": real_time_data["technical_signals"]
+                                },
+                                "trading_points": real_time_data["trading_points"],
+                                "support_resistance": {
+                                    "support": real_time_data["support_levels"],
+                                    "resistance": real_time_data["resistance_levels"]
+                                }
+                            })
+                            
+                            # 更新买卖策略为具体价格
+                            stock["entry_strategy"] = f"建议买入价：¥{real_time_data['trading_points']['buy_price']}，支撑位：¥{real_time_data['support_levels']['primary']}"
+                            stock["exit_strategy"] = f"建议卖出价：¥{real_time_data['trading_points']['sell_price']}，阻力位：¥{real_time_data['resistance_levels']['primary']}"
+                            stock["stop_loss"] = f"止损价：¥{real_time_data['trading_points']['stop_loss']}"
+                            
+                            verified_stocks.append(stock)
+                            print(f"✅ {stock['code']} {stock['name']} 验证为{industry}行业，实时价格：¥{real_time_data['current_price']}")
+                        else:
+                            print(f"⚠️ {stock['code']} {stock['name']} 实时数据获取失败，跳过")
                     else:
-                        print(f"⚠️ {stock['code']} {stock['name']} 实时数据获取失败，跳过")
-                else:
-                    actual_industry = get_stock_industry(stock["code"])
-                    print(f"❌ {stock['code']} {stock['name']} 实际为{actual_industry}行业，不属于{industry}行业，已过滤")
-            
-            if verified_stocks:
-                return verified_stocks
-            else:
-                print(f"⚠️ {industry}行业没有找到合适的股票，返回空")
+                        actual_industry = get_stock_industry(stock["code"])
+                        print(f"❌ {stock['code']} {stock['name']} 实际为{actual_industry}行业，不属于{industry}行业，已过滤")
+                    
+                    if verified_stocks:
+                        return verified_stocks
+                    else:
+                        print(f"⚠️ {industry}行业没有找到合适的股票，返回空")
+                        return []
+                        
+            except json.JSONDecodeError:
+                print(f"⚠️ AI返回格式错误，返回空")
                 return []
                 
-        except json.JSONDecodeError:
-            print(f"⚠️ AI返回格式错误，返回空")
-            return []
+        except TimeoutError:
+            print(f"⚠️ {industry}行业股票推荐AI分析超时，使用备用推荐")
+            signal.alarm(0)
+            return get_fallback_stocks_by_industry(industry)
+        finally:
+            signal.alarm(0)  # 确保取消超时
             
     except Exception as e:
         print(f"⚠️ 股票推荐失败: {e}")
-        return []
+        return get_fallback_stocks_by_industry(industry)
 
 # 按行业获取备用股票推荐
 def get_fallback_stocks_by_industry(industry):
