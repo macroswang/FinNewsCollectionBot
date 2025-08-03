@@ -174,7 +174,7 @@ def summarize(text, global_events=None):
                  
                  4. **短线交易策略**：
                     - 建议买入时机和价格区间
-                    - 设置合理的止盈止损位（止盈≤10%，止损≤-3%）
+                    - 设置合理的止盈止损位
                     - 提供持仓时间建议（1-5个交易日）
                     - 分析快进快出的最佳时机
                  
@@ -234,13 +234,15 @@ def summarize(text, global_events=None):
                  - 重点关注板块轮动和热点切换
                  - 分析资金流向和情绪变化
                  - 提供具体的操作建议和风险控制
-                 - 推荐股票要结合新闻热点，优先选择中小盘股票（市值100-500亿）
+                 - 推荐股票要结合新闻热点，优先选择中小盘股票（市值≤500亿）
                  - 避免推荐超大市值股票（如茅台、宁德时代等）
                  - **重要：只推荐A股股票，不要推荐港股、美股或其他海外股票**
                  - 股票代码格式：6位数字（如000001、600000、300001等）
                  - **关键要求：具体股票推荐必须从热点板块和轮动机会中通过AI分析总结后产生，确保推荐的股票与新闻热点和板块轮动逻辑直接相关**
                  - **技术面分析要求：为每只推荐的股票提供技术面支撑位/阻力位分析，包括近期低点、高点、关键均线位置等**
                  - **股价信息要求：提供最新股价信息，包括当前价格、涨跌幅、成交量等关键数据**
+                 - **市值限制要求：严格只推荐市值在500亿以下的中小盘股票，绝对不要推荐市值超过500亿的大盘股**
+                 - **禁止推荐股票：茅台、宁德时代、比亚迪、中国平安、招商银行等市值超过1000亿的超大盘股**
                  """},
                 {"role": "user", "content": f"新闻内容：{text}\n\n{global_context}"}
             ]
@@ -661,6 +663,31 @@ def verify_stock_industry(stock_code, target_industry):
     actual_industry = get_stock_industry(stock_code)
     return actual_industry == target_industry
 
+def check_stock_market_cap(stock_code):
+    """检查股票市值是否符合中小盘标准（≤500亿）"""
+    try:
+        real_time_data = get_real_time_stock_data(stock_code)
+        if real_time_data and real_time_data.get("market_cap") and real_time_data["market_cap"] != 'N/A':
+            market_cap = real_time_data["market_cap"]
+            if isinstance(market_cap, (int, float)):
+                # 转换为亿元
+                market_cap_billion = market_cap / 100000000  # 转换为亿元
+                if market_cap_billion <= 500:
+                    print(f"✅ {stock_code} 市值 {market_cap_billion:.1f}亿，符合中小盘标准")
+                    return True
+                else:
+                    print(f"❌ {stock_code} 市值 {market_cap_billion:.1f}亿，不符合中小盘标准（≤500亿）")
+                    return False
+            else:
+                print(f"⚠️ {stock_code} 市值数据格式异常: {market_cap}")
+                return True  # 如果无法获取市值，暂时通过
+        else:
+            print(f"⚠️ {stock_code} 无法获取市值数据，暂时通过验证")
+            return True  # 如果无法获取市值，暂时通过
+    except Exception as e:
+        print(f"⚠️ 检查{stock_code}市值时出错: {e}")
+        return True  # 出错时暂时通过
+
 # 获取具体股票推荐（修复版）
 def get_specific_stock_recommendations(industry, news_summary):
     """基于行业和新闻摘要获取具体股票推荐，确保股票行业分类准确"""
@@ -696,6 +723,8 @@ def get_specific_stock_recommendations(industry, news_summary):
         6. 只返回JSON格式，不要其他文字
         7. 确保推荐的股票确实属于{industry}行业
         8. 重点关注1-5个交易日的短线机会
+        9. **严格限制市值范围：只推荐市值在500亿以下的中小盘股票**
+        10. **避免推荐超大市值股票（如茅台、宁德时代、比亚迪等市值超过1000亿的股票）**
         """
 
         completion = openai_client.chat.completions.create(
@@ -714,12 +743,17 @@ def get_specific_stock_recommendations(industry, news_summary):
             result = json.loads(response_text)
             stocks = result.get("stocks", [])
             
-            # 验证股票行业分类
+            # 验证股票行业分类和市值
             verified_stocks = []
             for stock in stocks:
+                # 首先验证行业分类
                 if verify_stock_industry(stock["code"], industry):
-                    verified_stocks.append(stock)
-                    print(f"✅ {stock['code']} {stock['name']} 验证为{industry}行业")
+                    # 然后验证市值是否符合中小盘标准
+                    if check_stock_market_cap(stock["code"]):
+                        verified_stocks.append(stock)
+                        print(f"✅ {stock['code']} {stock['name']} 验证通过：{industry}行业 + 中小盘市值")
+                    else:
+                        print(f"❌ {stock['code']} {stock['name']} 市值不符合中小盘标准，已过滤")
                 else:
                     actual_industry = get_stock_industry(stock["code"])
                     print(f"❌ {stock['code']} {stock['name']} 实际为{actual_industry}行业，不属于{industry}行业，已过滤")
@@ -968,12 +1002,16 @@ def extract_stock_recommendations_from_summary(summary):
                                 "impact": "中"  # 默认值
                             }
                             
-                            if in_hot_stocks:
-                                stock_recommendations["hot_sector_stocks"].append(stock_data)
-                                print(f"✅ 添加热点板块股票: {stock_code} {stock_name}")
-                            elif in_rotation_stocks:
-                                stock_recommendations["rotation_stocks"].append(stock_data)
-                                print(f"✅ 添加轮动机会股票: {stock_code} {stock_name}")
+                            # 在添加到推荐列表前检查市值
+                            if check_stock_market_cap(stock_code):
+                                if in_hot_stocks:
+                                    stock_recommendations["hot_sector_stocks"].append(stock_data)
+                                    print(f"✅ 添加热点板块股票: {stock_code} {stock_name} (市值符合中小盘标准)")
+                                elif in_rotation_stocks:
+                                    stock_recommendations["rotation_stocks"].append(stock_data)
+                                    print(f"✅ 添加轮动机会股票: {stock_code} {stock_name} (市值符合中小盘标准)")
+                            else:
+                                print(f"❌ {stock_code} {stock_name} 市值不符合中小盘标准，已过滤")
                         else:
                             print(f"⚠️ 未找到有效的股票代码: {stock_info}")
                             # 显示该行的详细信息用于调试
