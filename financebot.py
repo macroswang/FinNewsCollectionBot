@@ -1399,7 +1399,8 @@ if __name__ == "__main__":
     print(f"🔍 AI摘要中是否包含'具体股票推荐': {'具体股票推荐' in cleaned_summary}")
     print(f"🔍 AI摘要中是否包含'热点板块股票': {'热点板块股票' in cleaned_summary}")
     print(f"🔍 AI摘要中是否包含'轮动机会股票': {'轮动机会股票' in cleaned_summary}")
-    print(f"🔍 AI摘要中是否包含6位数字股票代码: {bool(re.search(r'\\b\\d{6}\\b', cleaned_summary))}")
+    has_6digit_codes = bool(re.search(r'\b\d{6}\b', cleaned_summary))
+    print(f"🔍 AI摘要中是否包含6位数字股票代码: {has_6digit_codes}")
     
     if has_stock_recommendations_in_summary:
         # AI摘要中已包含股票推荐，不再添加重复内容
