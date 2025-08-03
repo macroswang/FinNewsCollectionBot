@@ -1284,12 +1284,6 @@ if __name__ == "__main__":
                 stock_recommendations += f"买入策略：{stock['entry_strategy']}。\n"
                 stock_recommendations += f"卖出策略：{stock['exit_strategy']}\n"
                 
-                # 显示从AI摘要中提取的技术面信息
-                if stock.get('support_resistance') and stock['support_resistance'] != "待获取":
-                    stock_recommendations += f"技术面支撑/阻力：{stock['support_resistance']}\n"
-                if stock.get('current_price') and stock['current_price'] != "待获取":
-                    stock_recommendations += f"AI分析股价：{stock['current_price']}\n"
-                
                 # 显示最新价格数据
                 if real_time_data:
                     price_change_emoji = "📈" if real_time_data["price_change"] > 0 else "📉" if real_time_data["price_change"] < 0 else "➡️"
@@ -1301,9 +1295,12 @@ if __name__ == "__main__":
                         trend = "上涨" if real_time_data["current_price"] > real_time_data["ma20"] else "下跌" if real_time_data["current_price"] < real_time_data["ma20"] else "震荡"
                         stock_recommendations += f"技术面：{trend} | MA20:¥{real_time_data['ma20']:.2f} | MA50:¥{real_time_data['ma50']:.2f}\n"
                     
-                    # 显示支撑阻力位
+                    # 显示支撑阻力位（优先使用实时数据）
                     if real_time_data.get("recent_low") and real_time_data.get("recent_high"):
                         stock_recommendations += f"支撑/阻力：¥{real_time_data['recent_low']:.2f} / ¥{real_time_data['recent_high']:.2f}\n"
+                    # 如果实时数据没有支撑阻力位，则使用AI摘要中的信息
+                    elif stock.get('support_resistance') and stock['support_resistance'] != "待获取":
+                        stock_recommendations += f"技术面支撑/阻力：{stock['support_resistance']}\n"
                     
                     # 显示成交量分析
                     if real_time_data.get("volume_ratio"):
@@ -1352,12 +1349,6 @@ if __name__ == "__main__":
                 stock_recommendations += f"买入策略：{stock['entry_strategy']}。\n"
                 stock_recommendations += f"卖出策略：{stock['exit_strategy']}\n"
                 
-                # 显示从AI摘要中提取的技术面信息
-                if stock.get('support_resistance') and stock['support_resistance'] != "待获取":
-                    stock_recommendations += f"技术面支撑/阻力：{stock['support_resistance']}\n"
-                if stock.get('current_price') and stock['current_price'] != "待获取":
-                    stock_recommendations += f"AI分析股价：{stock['current_price']}\n"
-                
                 # 显示最新价格数据
                 if real_time_data:
                     price_change_emoji = "📈" if real_time_data["price_change"] > 0 else "📉" if real_time_data["price_change"] < 0 else "➡️"
@@ -1369,9 +1360,12 @@ if __name__ == "__main__":
                         trend = "上涨" if real_time_data["current_price"] > real_time_data["ma20"] else "下跌" if real_time_data["current_price"] < real_time_data["ma20"] else "震荡"
                         stock_recommendations += f"技术面：{trend} | MA20:¥{real_time_data['ma20']:.2f} | MA50:¥{real_time_data['ma50']:.2f}\n"
                     
-                    # 显示支撑阻力位
+                    # 显示支撑阻力位（优先使用实时数据）
                     if real_time_data.get("recent_low") and real_time_data.get("recent_high"):
                         stock_recommendations += f"支撑/阻力：¥{real_time_data['recent_low']:.2f} / ¥{real_time_data['recent_high']:.2f}\n"
+                    # 如果实时数据没有支撑阻力位，则使用AI摘要中的信息
+                    elif stock.get('support_resistance') and stock['support_resistance'] != "待获取":
+                        stock_recommendations += f"技术面支撑/阻力：{stock['support_resistance']}\n"
                     
                     # 显示成交量分析
                     if real_time_data.get("volume_ratio"):
