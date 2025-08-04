@@ -1,146 +1,110 @@
-# 财经新闻收集机器人
+# 📈 FinNewsCollectionBot · 每日财经速递
 
-一个自动收集财经新闻、分析市场动态并推送投资建议的Python机器人。
+**为专业投资者打造的智能财经资讯助手**
 
-## 功能特性
+[![📡 RSS 财经新闻自动推送](https://github.com/sgrsun3/FinNewsCollectionBot/actions/workflows/rss-bot.yml/badge.svg)](https://github.com/sgrsun3/FinNewsCollectionBot/actions/workflows/rss-bot.yml)
+![GitHub Stars](https://img.shields.io/github/stars/sgrsun3/FinNewsCollectionBot?style=social)
+![License](https://img.shields.io/github/license/sgrsun3/FinNewsCollectionBot)
 
-### 📰 新闻收集
-- 自动抓取多个财经RSS源
-- 支持华尔街见闻、36氪、东方财富等主流财经媒体
-- 智能提取文章正文内容用于AI分析
+---
+## 🧧 支持作者 · 让项目持续进化！
 
-### 🤖 AI智能分析
-- 基于DeepSeek AI模型进行新闻摘要和分析
-- 识别市场热点和投资机会
-- 提供全球市场联动分析
+如果本项目对你有帮助，欢迎打赏支持，资助我多喝几杯咖啡 ☕，跑更多模型 💻～
 
-### 📊 股票推荐系统
-- **动态行业分类验证**：确保推荐的股票真正属于对应行业
-- 实时获取股票基本面和技术面数据
-- 提供买入建议、止损位和目标价
-- 支持多个行业板块：新能源、半导体、医药、消费、科技、基建、银行、化工
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/0f8c1057-3ab2-4e87-8c32-5a7726214a5d" width="280" />
+</div>
 
-### 📈 市场数据
-- 实时获取主要指数数据
-- 市场情绪分析
-- 投资时机判断
+- 💬 微信号：`ArkhamKni9ht`
+- 🙌 感谢每一位 Star、Fork 和支持者！
 
-### 📱 微信推送
-- 支持Server酱推送
-- 格式化的财经日报
+> ✨ 金融爸爸一块钱我不嫌少，一百块我也不嫌多 😊
+---
 
-## 修复和改进
+## 🎯 项目简介
 
-### 🔧 股票推荐系统修复
-**问题描述**：原系统中存在股票行业分类不准确的问题，导致：
-- 基建板块推荐了立讯精密、药明康德、长江电力等不相关股票
-- 新能源板块包含了药明康德、立讯精密等错误分类的股票
-- 缺乏动态行业分类验证机制
+FinNewsCollectionBot 是一款为券商分析师、基金经理、研究员等专业投资人量身打造的**财经资讯智能摘要助手**。
 
-**解决方案**：
-1. **动态行业分类获取**：使用yfinance API实时获取股票的真实行业分类
-2. **智能行业映射**：建立英文行业分类到中文的映射关系
-3. **双重验证机制**：在推荐前验证股票是否真正属于目标行业
-4. **备用分类系统**：当动态获取失败时使用预定义的行业分类
+它自动聚合主流财经媒体的 RSS 信息源，并调用 **DeepSeek 大语言模型**，每天两次推送核心财经摘要，帮助你快速掌握全球市场动态、产业趋势与政策走向。
 
-**修复效果**：
-- ✅ 股票行业分类准确率达到100%
-- ✅ 每个行业只推荐真正属于该行业的股票
-- ✅ 消除了跨行业错误推荐问题
+---
 
-### 📊 行业分类映射
-支持的主要行业分类：
-- **新能源**：宁德时代、比亚迪、阳光电源等
-- **半导体**：中芯国际、紫光国微、兆易创新等
-- **医药**：爱尔眼科、恒瑞医药、迈瑞医疗等
-- **消费**：五粮液、贵州茅台、洋河股份等
-- **科技**：立讯精密、京东方A、海康威视等
-- **基建**：中国建筑、中国中铁、中国铁建等
-- **银行**：平安银行、招商银行、工商银行等
-- **化工**：万华化学、卫星化学、华鲁恒升等
+## 🚀 核心功能
 
-## 安装和使用
+- ⏰ **每日两次自动摘要推送**  
+  每天上午 09:00、下午 17:00 定时运行，生成分析报告
 
-### 环境要求
-- Python 3.8+
-- 虚拟环境（推荐）
+- 🌐 **多源财经 RSS 聚合**  
+  支持华尔街见闻、36氪、东方财富、华尔街日报、BBC 等主流财经媒体
 
-### 安装步骤
-```bash
-# 克隆项目
-git clone <repository-url>
-cd FinNewsCollectionBot
+- 🧠 **大模型深度分析**  
+  使用 DeepSeek 大语言模型自动提炼财经新闻的核心内容与趋势判断
 
-# 创建虚拟环境
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或
-venv\Scripts\activate  # Windows
+- 📲 **微信即时推送**  
+  集成 Server 酱服务，生成的财经摘要自动推送至你的微信
 
-# 安装依赖
-pip install -r requirements.txt
+---
+
+## 🧑‍💻 技术栈
+
+- Python
+- feedparser + newspaper3k
+- DeepSeek 大语言模型 API
+- GitHub Actions 自动定时部署
+
+---
+
+## 🔧 快速开始（快速部署）
+
+1. **Fork 本项目**
+2. 配置你的 RSS 源地址和 DeepSeek API Key
+3. 在 GitHub 中设置 Secrets：
+   ```bash
+   OPENAI_API_KEY=your_deepseek_api_key
+   SERVER_CHAN_KEYS=your_serverchan_key
+   ```
+4. 自动触发 GitHub Actions 开始运行
+
+📌 成功部署后，每天两次财经摘要将自动生成并推送到你的微信！
+
+---
+
+## 💼 使用场景
+
+- 券商/基金公司/研究所自动生成投资快报
+- 金融从业者日常资讯监测
+- 个人投资者快捷了解宏观政策/产业热点
+- 财经内容运营/财经公众号 AI 辅助创作
+
+---
+
+## 📌 示例流程图
+
+```mermaid
+graph TD
+  A[财经RSS源] --> B[抓取文章]
+  B --> C[调用DeepSeek大模型]
+  C --> D[生成财经摘要]
+  D --> E[Server酱推送到微信]
 ```
 
-### 配置环境变量
-```bash
-export OPENAI_API_KEY="your-openai-api-key"
-export SERVER_CHAN_KEYS="key1,key2,key3"
-```
+---
 
-### 运行
-```bash
-python financebot.py
-```
+## 🛠️ 后续规划
 
-## 配置说明
+- ✅ 增加更多 RSS 财经数据源
+- ✅ 引入情绪分析与金融事件检测
+- ⏳ 支持多语言财经摘要生成
+- ⏳ 构建简洁前端页面用于非技术用户管理配置
 
-### RSS源配置
-在`financebot.py`中的`rss_feeds`字典中配置RSS源：
-```python
-rss_feeds = {
-    "💲 华尔街见闻": {
-        "华尔街见闻": "https://dedicated.wallstreetcn.com/rss.xml",
-    },
-    "💻 36氪": {
-        "36氪": "https://36kr.com/feed",
-    },
-    # 更多RSS源...
-}
-```
+---
 
-### 股票推荐配置
-系统会自动验证股票行业分类，无需手动配置。如需添加新的股票，请在`get_fallback_industry`函数中添加映射关系。
+## 🤝 欢迎参与
 
-## 输出示例
+📬 欢迎 Star ⭐ / Fork 🍴 / PR 💡 本项目，一起共建更智能的财经决策工具。
 
-### 股票推荐格式
-```
-📈 新能源板块
-- **300750 宁德时代** 🟡 🔥
-  - 推荐理由: 动力电池龙头，技术领先
-  - 风险等级: 中
-  - 影响程度: 高
-  - 实时价格: ¥263.07 📉 -0.59%
-  - 估值: PE19.8 | PB3.95
-  - 技术面: 下跌 | MA20:¥274.00 | MA50:¥260.00
-  - 支撑/阻力: ¥258.88 / ¥292.20
-  - 成交量: 📊 1.1倍
-  - 买入建议: ¥249.92以下
-  - 止损位: ¥242.02
-  - 目标价: ¥302.53
-```
+你也可以通过 Issues 留言建议功能，或私信我交流使用体验～
 
-## 注意事项
+---
 
-1. **投资风险提示**：本系统提供的投资建议仅供参考，投资有风险，入市需谨慎
-2. **API限制**：注意OpenAI API的使用限制和费用
-3. **数据准确性**：股票数据来源于yfinance，可能存在延迟或误差
-4. **行业分类**：行业分类基于yfinance数据，可能与实际分类存在差异
-
-## 贡献
-
-欢迎提交Issue和Pull Request来改进这个项目。
-
-## 许可证
-
-MIT License
+© 2024 sgrsun3 | MIT License
