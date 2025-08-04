@@ -265,24 +265,6 @@ def summarize(text, global_events=None):
 def get_market_sentiment():
     """获取市场情绪数据，包含更详细的市场状态分析"""
     return {
-        "上证指数": "📈 上涨趋势",
-        "深证成指": "📊 震荡整理", 
-        "创业板指": "📈 强势反弹",
-        "北向资金": "💰 净流入",
-        "市场情绪": "😊 偏乐观",
-        "成交量": "📊 温和放量",
-        "板块轮动": "🔄 科技→消费→新能源",
-        "资金流向": "💸 主力资金净流入",
-        "技术形态": "📈 突破关键阻力位",
-        "短线机会": "🎯 科技、新能源板块活跃",
-        "风险提示": "⚠️ 关注外部风险事件",
-        "操作建议": "💡 逢低买入，不追高",
-        "散户情绪": "😊 散户参与度较高",
-        "机构动向": "🏢 机构资金流入科技股",
-        "热点板块": "🔥 半导体、新能源、医药",
-        "超跌反弹": "📈 消费、银行板块机会",
-        "短线风险": "⚠️ 高位股回调风险",
-        "资金面": "💰 流动性充裕，支持短线交易"
     }
 
 # 市场时机分析
@@ -306,7 +288,7 @@ def analyze_market_timing():
         "消息面": "📰 政策利好频出",
         "资金面": "💰 流动性充裕"
     }
-    return timing_analysis
+    return {}
 
 # 获取主要指数实时数据
 def get_market_indices():
@@ -772,16 +754,6 @@ def get_specific_stock_recommendations(industry, news_summary):
         print(f"⚠️ 股票推荐失败: {e}")
         return []
 
-# 按行业获取备用股票推荐（已废弃）
-def get_fallback_stocks_by_industry(industry):
-    """按行业获取备用股票推荐（已废弃，直接返回空列表）"""
-    return []
-
-# 生成股票推荐模板（保持向后兼容）
-def generate_stock_recommendations(industry):
-    """基于行业生成股票推荐模板（已废弃，直接返回空列表）"""
-    return []
-
 # 新增：从AI摘要中提取股票推荐信息
 def extract_stock_recommendations_from_summary(summary):
     """从AI摘要中提取股票推荐信息"""
@@ -803,8 +775,16 @@ def extract_stock_recommendations_from_summary(summary):
         
         if stock_lines:
             print(f"🔍 发现可能包含股票信息的行:")
-            for line in stock_lines[:5]:  # 只显示前5行
+            for line in stock_lines[:10]:  # 显示前10行
                 print(f"   {line}")
+        
+        # 特别检查是否包含你提供的格式
+        if "推荐理由：" in summary:
+            print("🔍 发现包含'推荐理由：'格式的股票信息")
+        if "风险等级：" in summary:
+            print("🔍 发现包含'风险等级：'格式的股票信息")
+        if "技术面：" in summary:
+            print("🔍 发现包含'技术面：'格式的股票信息")
         
         if "具体股票推荐" in summary or "热点板块股票" in summary or "A股" in summary:
             lines = summary.split('\n')
@@ -840,10 +820,25 @@ def extract_stock_recommendations_from_summary(summary):
                 
                 # 提取股票信息 - 放宽条件，支持多种格式
                 if (in_hot_stocks or in_rotation_stocks) and len(line) > 2:
-                    # 支持多种开头格式：-、•、*、数字等
-                    if line.startswith('-') or line.startswith('•') or line.startswith('*') or line[0].isdigit():
+                    # 支持多种开头格式：-、•、*、数字等，或者包含6位数字股票代码的行
+                    import re
+                    has_stock_code = bool(re.search(r'\b\d{6}\b', line))
+                    
+                    # 调试信息
+                    print(f"🔍 检查行: '{line}'")
+                    print(f"  in_hot_stocks: {in_hot_stocks}")
+                    print(f"  in_rotation_stocks: {in_rotation_stocks}")
+                    print(f"  has_stock_code: {has_stock_code}")
+                    print(f"  starts_with_digit: {line[0].isdigit() if line else False}")
+                    print(f"  starts_with_symbol: {line.startswith('-') or line.startswith('•') or line.startswith('*')}")
+                    
+                    if (line.startswith('-') or line.startswith('•') or line.startswith('*') or 
+                        line[0].isdigit() or has_stock_code):
                         print(f"🔍 正在处理股票信息行: {line}")
                         print(f"🔍 当前状态: in_hot_stocks={in_hot_stocks}, in_rotation_stocks={in_rotation_stocks}")
+                        print(f"🔍 包含股票代码: {has_stock_code}")
+                        print(f"🔍 以数字开头: {line[0].isdigit() if line else False}")
+                        print(f"🔍 以特殊符号开头: {line.startswith('-') or line.startswith('•') or line.startswith('*')}")
                         
                         # 移除开头符号
                         if line.startswith('-') or line.startswith('•') or line.startswith('*'):
@@ -898,6 +893,67 @@ def extract_stock_recommendations_from_summary(summary):
                                     entry_strategy = details[4]
                                     exit_strategy = details[5]
                         
+                        # 格式3：股票代码 股票名称 推荐理由：... 风险等级：... 等格式
+                        elif '推荐理由：' in stock_info:
+                            # 查找6位数字的股票代码
+                            import re
+                            code_match = re.search(r'\b\d{6}\b', stock_info)
+                            if code_match:
+                                stock_code = code_match.group()
+                                
+                                # 提取股票名称（股票代码后的第一个词）
+                                name_match = re.search(rf'{stock_code}\s+([^\s]+)', stock_info)
+                                if name_match:
+                                    stock_name = name_match.group(1)
+                                else:
+                                    stock_name = "未知"
+                                
+                                # 提取推荐理由
+                                reason_match = re.search(r'推荐理由：([^。]+)', stock_info)
+                                if reason_match:
+                                    reason = reason_match.group(1).strip()
+                                
+                                # 提取风险等级
+                                risk_match = re.search(r'风险等级：([^。]+)', stock_info)
+                                if risk_match:
+                                    risk = risk_match.group(1).strip()
+                                
+                                # 提取短线潜力
+                                potential_match = re.search(r'短线潜力：([^。]+)', stock_info)
+                                if potential_match:
+                                    potential = potential_match.group(1).strip()
+                                
+                                # 提取持仓时间
+                                holding_match = re.search(r'持仓时间：([^。]+)', stock_info)
+                                if holding_match:
+                                    holding_period = holding_match.group(1).strip()
+                                
+                                # 提取买入策略
+                                entry_match = re.search(r'买入策略：([^。]+)', stock_info)
+                                if entry_match:
+                                    entry_strategy = entry_match.group(1).strip()
+                                
+                                # 提取卖出策略
+                                exit_match = re.search(r'卖出策略：([^。]+)', stock_info)
+                                if exit_match:
+                                    exit_strategy = exit_match.group(1).strip()
+                                
+                                # 提取技术面信息
+                                support_resistance = "待获取"
+                                if '技术面：' in stock_info:
+                                    tech_match = re.search(r'技术面：([^。]+)', stock_info)
+                                    if tech_match:
+                                        support_resistance = tech_match.group(1).strip()
+                                
+                                print(f"🔍 从推荐理由格式提取: {stock_code} {stock_name}")
+                                print(f"  推荐理由: {reason}")
+                                print(f"  风险等级: {risk}")
+                                print(f"  短线潜力: {potential}")
+                                print(f"  持仓时间: {holding_period}")
+                                print(f"  买入策略: {entry_strategy}")
+                                print(f"  卖出策略: {exit_strategy}")
+                                print(f"  技术面: {support_resistance}")
+                        
                         # 格式2：直接包含股票代码的行
                         elif any(char.isdigit() for char in stock_info):
                             # 查找6位数字的股票代码
@@ -931,91 +987,95 @@ def extract_stock_recommendations_from_summary(summary):
                         
                         # 如果找到了股票代码，创建股票数据
                         if stock_code and stock_code.isdigit() and len(stock_code) == 6:
-                            # 尝试从原始文本中提取更多信息
-                            if '：' in stock_info:
-                                details_part = stock_info.split('：', 1)[1]
-                                # 尝试提取推荐理由（冒号后的第一句话）
-                                sentences = details_part.split('。')
-                                if sentences:
-                                    reason = sentences[0].strip()
+                                print(f"✅ 找到有效股票代码: {stock_code} {stock_name}")
                                 
-                                # 尝试提取风险等级
-                                if '风险等级' in details_part:
-                                    risk_match = re.search(r'风险等级([低中高])', details_part)
-                                    if risk_match:
-                                        risk = risk_match.group(1)
-                                
-                                # 尝试提取持仓时间
-                                if '持仓' in details_part:
-                                    holding_match = re.search(r'持仓(\d+天)', details_part)
-                                    if holding_match:
-                                        holding_period = holding_match.group(1)
-                                
-                                # 尝试提取买入策略
-                                if '买入' in details_part:
-                                    entry_match = re.search(r'([^，。]+买入[^，。]*)', details_part)
-                                    if entry_match:
-                                        entry_strategy = entry_match.group(1).strip()
-                                
-                                # 尝试提取止盈止损
-                                if '止盈' in details_part or '止损' in details_part:
-                                    exit_match = re.search(r'([^，。]*(?:止盈|止损)[^，。]*)', details_part)
-                                    if exit_match:
-                                        exit_strategy = exit_match.group(1).strip()
-                                
-                                # 尝试提取技术面支撑位/阻力位信息
-                                support_resistance = "待获取"
-                                if '支撑' in details_part or '阻力' in details_part:
-                                    sr_match = re.search(r'支撑[位]*[：:]*([^，。]+)[，。]?阻力[位]*[：:]*([^，。]+)', details_part)
-                                    if sr_match:
-                                        support_resistance = f"支撑{sr_match.group(1)}，阻力{sr_match.group(2)}"
-                                    else:
-                                        # 分别查找支撑和阻力
-                                        support_match = re.search(r'支撑[位]*[：:]*([^，。]+)', details_part)
-                                        resistance_match = re.search(r'阻力[位]*[：:]*([^，。]+)', details_part)
-                                        if support_match or resistance_match:
-                                            support = support_match.group(1) if support_match else "待确认"
-                                            resistance = resistance_match.group(1) if resistance_match else "待确认"
-                                            support_resistance = f"支撑{support}，阻力{resistance}"
-                                
-                                # 尝试提取最新股价信息
-                                current_price = "待获取"
-                                if '股价' in details_part or '价格' in details_part or '¥' in details_part:
-                                    price_match = re.search(r'[¥￥]?(\d+\.?\d*)', details_part)
-                                    if price_match:
-                                        current_price = f"¥{price_match.group(1)}"
-                                    elif '最新价格' in details_part:
-                                        price_match = re.search(r'最新价格[：:]*([^，。]+)', details_part)
+                                # 尝试从原始文本中提取更多信息
+                                if '：' in stock_info:
+                                    details_part = stock_info.split('：', 1)[1]
+                                    # 尝试提取推荐理由（冒号后的第一句话）
+                                    sentences = details_part.split('。')
+                                    if sentences:
+                                        reason = sentences[0].strip()
+                                    
+                                    # 尝试提取风险等级
+                                    if '风险等级' in details_part:
+                                        risk_match = re.search(r'风险等级([低中高])', details_part)
+                                        if risk_match:
+                                            risk = risk_match.group(1)
+                                    
+                                    # 尝试提取持仓时间
+                                    if '持仓' in details_part:
+                                        holding_match = re.search(r'持仓(\d+天)', details_part)
+                                        if holding_match:
+                                            holding_period = holding_match.group(1)
+                                    
+                                    # 尝试提取买入策略
+                                    if '买入' in details_part:
+                                        entry_match = re.search(r'([^，。]+买入[^，。]*)', details_part)
+                                        if entry_match:
+                                            entry_strategy = entry_match.group(1).strip()
+                                    
+                                    # 尝试提取止盈止损
+                                    if '止盈' in details_part or '止损' in details_part:
+                                        exit_match = re.search(r'([^，。]*(?:止盈|止损)[^，。]*)', details_part)
+                                        if exit_match:
+                                            exit_strategy = exit_match.group(1).strip()
+                                    
+                                    # 尝试提取技术面支撑位/阻力位信息
+                                    support_resistance = "待获取"
+                                    if '支撑' in details_part or '阻力' in details_part:
+                                        sr_match = re.search(r'支撑[位]*[：:]*([^，。]+)[，。]?阻力[位]*[：:]*([^，。]+)', details_part)
+                                        if sr_match:
+                                            support_resistance = f"支撑{sr_match.group(1)}，阻力{sr_match.group(2)}"
+                                        else:
+                                            # 分别查找支撑和阻力
+                                            support_match = re.search(r'支撑[位]*[：:]*([^，。]+)', details_part)
+                                            resistance_match = re.search(r'阻力[位]*[：:]*([^，。]+)', details_part)
+                                            if support_match or resistance_match:
+                                                support = support_match.group(1) if support_match else "待确认"
+                                                resistance = resistance_match.group(1) if resistance_match else "待确认"
+                                                support_resistance = f"支撑{support}，阻力{resistance}"
+                                    
+                                    # 尝试提取最新股价信息
+                                    current_price = "待获取"
+                                    if '股价' in details_part or '价格' in details_part or '¥' in details_part:
+                                        price_match = re.search(r'[¥￥]?(\d+\.?\d*)', details_part)
                                         if price_match:
-                                            current_price = price_match.group(1).strip()
-                            
-                            stock_data = {
-                                "code": stock_code,
-                                "name": stock_name or "未知",
-                                "reason": reason,
-                                "risk": risk,
-                                "short_term_potential": potential,
-                                "holding_period": holding_period,
-                                "entry_strategy": entry_strategy,
-                                "exit_strategy": exit_strategy,
-                                "support_resistance": support_resistance if 'support_resistance' in locals() else "待获取",
-                                "current_price": current_price if 'current_price' in locals() else "待获取",
-                                "impact": "中"  # 默认值
-                            }
-                            
-                            # 首先添加到所有股票列表中（用于更新AI摘要）
-                            stock_recommendations["all_stocks_in_summary"].append(stock_data)
-                            
-                            # 然后检查市值，决定是否添加到推荐列表
-                            if check_stock_market_cap(stock_code):
-                                if in_hot_stocks:
-                                    stock_recommendations["hot_sector_stocks"].append(stock_data)
-                                    print(f"✅ 添加热点板块股票: {stock_code} {stock_name} (市值符合中小盘标准)")
-                                elif in_rotation_stocks:
-                                    stock_recommendations["rotation_stocks"].append(stock_data)
-                                    print(f"✅ 添加轮动机会股票: {stock_code} {stock_name} (市值符合中小盘标准)")
-                            else:
-                                print(f"❌ {stock_code} {stock_name} 市值不符合中小盘标准，已过滤")
+                                            current_price = f"¥{price_match.group(1)}"
+                                        elif '最新价格' in details_part:
+                                            price_match = re.search(r'最新价格[：:]*([^，。]+)', details_part)
+                                            if price_match:
+                                                current_price = price_match.group(1).strip()
+                                
+                                stock_data = {
+                                    "code": stock_code,
+                                    "name": stock_name or "未知",
+                                    "reason": reason,
+                                    "risk": risk,
+                                    "short_term_potential": potential,
+                                    "holding_period": holding_period,
+                                    "entry_strategy": entry_strategy,
+                                    "exit_strategy": exit_strategy,
+                                    "support_resistance": support_resistance if 'support_resistance' in locals() else "待获取",
+                                    "current_price": current_price if 'current_price' in locals() else "待获取",
+                                    "impact": "中"  # 默认值
+                                }
+                                
+                                print(f"📊 解析到的股票数据: {stock_data}")
+                                
+                                # 首先添加到所有股票列表中（用于更新AI摘要）
+                                stock_recommendations["all_stocks_in_summary"].append(stock_data)
+                                
+                                # 然后检查市值，决定是否添加到推荐列表
+                                if check_stock_market_cap(stock_code):
+                                    if in_hot_stocks:
+                                        stock_recommendations["hot_sector_stocks"].append(stock_data)
+                                        print(f"✅ 添加热点板块股票: {stock_code} {stock_name} (市值符合中小盘标准)")
+                                    elif in_rotation_stocks:
+                                        stock_recommendations["rotation_stocks"].append(stock_data)
+                                        print(f"✅ 添加轮动机会股票: {stock_code} {stock_name} (市值符合中小盘标准)")
+                                else:
+                                    print(f"❌ {stock_code} {stock_name} 市值不符合中小盘标准，已过滤")
                         else:
                             print(f"⚠️ 未找到有效的股票代码: {stock_info}")
                             # 显示该行的详细信息用于调试
@@ -1168,62 +1228,6 @@ def send_to_wechat(title, content):
             print(f"✅ 推送成功: {key}")
         else:
             print(f"❌ 推送失败: {key}, 响应：{response.text}")
-
-# 散户短线交易快速分析
-def quick_short_term_analysis():
-    """为散户提供短线交易快速分析"""
-    analysis = {
-        "今日热点": {
-            "科技板块": "AI概念股活跃，关注回调机会",
-            "新能源": "政策利好频出，短线机会明显",
-            "医药": "创新药政策支持，关注龙头股",
-            "消费": "超跌反弹机会，关注白酒龙头"
-        },
-        "短线策略": {
-            "建仓时机": "早盘低开或尾盘回调时买入",
-            "持仓时间": "1-5个交易日",
-            "止盈位": "≤10%分批止盈",
-            "止损位": "≤-3%立即止损",
-            "仓位控制": "单只股票5-8%仓位"
-        },
-        "风险提示": {
-            "高位股": "避免追高，等待回调",
-            "概念股": "注意风险，快进快出",
-            "外部风险": "关注政策变化和外部事件",
-            "流动性": "选择成交量大的股票"
-        },
-        "操作建议": {
-            "买入": "分批建仓，回调买入",
-            "卖出": "及时止盈，严格止损",
-            "观察": "关注量能和技术形态",
-            "心态": "保持理性，不贪心"
-        }
-    }
-    return analysis
-
-# 生成散户短线交易专用摘要
-def generate_retail_short_term_summary():
-    """生成专门针对散户短线交易的摘要"""
-    quick_analysis = quick_short_term_analysis()
-    
-    summary = "## 🎯 散户短线交易专用分析\n\n"
-    
-    summary += "### 📈 今日热点板块\n"
-    for sector, reason in quick_analysis["今日热点"].items():
-        summary += f"- **{sector}**: {reason}\n"
-    summary += "\n"
-    
-    summary += "### ⚡ 短线操作策略\n"
-    for strategy, detail in quick_analysis["短线策略"].items():
-        summary += f"- **{strategy}**: {detail}\n"
-    summary += "\n"
-    
-    summary += "### 💡 操作建议\n"
-    for action, advice in quick_analysis["操作建议"].items():
-        summary += f"- **{action}**: {advice}\n"
-    summary += "\n"
-    
-    return summary
 
 if __name__ == "__main__":
     # 运行行业分类测试
@@ -1460,7 +1464,7 @@ if __name__ == "__main__":
             stock_recommendations += strategy_section
 
     # 生成散户短线交易专用分析
-    retail_analysis = generate_retail_short_term_summary()
+    retail_analysis = {}
     
     # 保留AI摘要的完整内容，不再移除具体股票推荐部分
     cleaned_summary = summary
