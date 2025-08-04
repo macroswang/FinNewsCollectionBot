@@ -380,6 +380,15 @@ def get_specific_stock_recommendations(industries, stocks, news_summary):
 
         response_text = completion.choices[0].message.content.strip()
 
+        # Strip Markdown code fences if present
+        response_text = response_text.strip()
+        if response_text.startswith("```json"):
+            response_text = response_text[len("```json"):].strip()
+        elif response_text.startswith("```"):
+            response_text = response_text[len("```"):].strip()
+        if response_text.endswith("```"):
+            response_text = response_text[:-3].strip()
+
         import json
         stocks_recommended = json.loads(response_text).get("stocks", [])
         final_stocks = []
