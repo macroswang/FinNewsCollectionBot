@@ -93,6 +93,19 @@ def fetch_feed_with_retry(url, retries=3, delay=5):
     print(f"❌ 跳过 {url}, 尝试 {retries} 次后仍失败。")
     return None
 
+# 检测是否为英文内容
+def is_english_content(text):
+    """检测文本是否为英文内容"""
+    if not text:
+        return False
+    
+    # 统计英文字符和中文字符
+    english_chars = len(re.findall(r'[a-zA-Z]', text))
+    chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
+    
+    # 如果英文字符数量明显多于中文字符，则认为是英文内容
+    return english_chars > chinese_chars * 2
+
 # 获取RSS内容（爬取正文但不展示）
 def fetch_rss_articles(rss_feeds, max_articles=10):
     news_data = {}
@@ -119,6 +132,11 @@ def fetch_rss_articles(rss_feeds, max_articles=10):
                 # 爬取正文用于分析（不展示）
                 article_text = fetch_article_text(link)
                 analysis_text += f"【{title}】\n{article_text}\n\n"
+
+                # 检测是否为英文内容，如果是则跳过展示
+                if is_english_content(title):
+                    print(f"🔹 {source} - {title} 获取成功（英文内容，仅用于分析）")
+                    continue
 
                 print(f"🔹 {source} - {title} 获取成功")
                 articles.append(f"- [{title}]({link})")
@@ -334,37 +352,57 @@ def get_real_time_stock_data(stock_code):
 def get_specific_stock_recommendations(industry, news_summary):
     """基于行业和新闻摘要获取具体股票推荐，包含实时基本面、技术面和买卖点分析"""
     try:
+        # 根据行业提供具体的股票推荐指导
+        industry_guidance = {
+            "银行": "推荐银行板块龙头股，如工商银行、建设银行、农业银行、中国银行等",
+            "消费": "推荐消费板块龙头股，如贵州茅台、五粮液、海天味业、伊利股份等",
+            "科技": "推荐科技板块龙头股，如腾讯、阿里巴巴、百度、美团等",
+            "新能源": "推荐新能源板块龙头股，如宁德时代、比亚迪、隆基绿能、阳光电源等",
+            "医药": "推荐医药板块龙头股，如恒瑞医药、迈瑞医疗、爱尔眼科、药明康德等",
+            "军工": "推荐军工板块龙头股，如中航沈飞、中航西飞、航天电子、中国重工等",
+            "半导体": "推荐半导体板块龙头股，如中芯国际、韦尔股份、北方华创、紫光国微等",
+            "房地产": "推荐房地产板块龙头股，如万科A、保利发展、招商蛇口、金地集团等",
+            "化工": "推荐化工板块龙头股，如万华化学、恒力石化、荣盛石化、桐昆股份等",
+            "汽车": "推荐汽车板块龙头股，如上汽集团、比亚迪、长城汽车、长安汽车等"
+        }
+        
+        guidance = industry_guidance.get(industry, f"推荐{industry}板块的龙头股票")
+        
         prompt = f"""
-        基于以下{industry}行业的新闻分析，推荐3-5只最相关的A股股票，并提供完整的投资分析：
+        基于以下{industry}行业的新闻分析，推荐3-5只最相关的A股股票：
 
         行业分析：{news_summary}
-
-        请按照以下格式返回JSON：
+        
+        推荐要求：
+        {guidance}
+        
+        请严格按照以下格式返回JSON：
         {{
             "stocks": [
                 {{
                     "code": "股票代码",
                     "name": "股票名称", 
-                    "reason": "推荐理由（基于行业分析）",
+                    "reason": "推荐理由（必须与{industry}行业直接相关）",
                     "risk": "风险等级（低/中/高）",
                     "impact": "影响程度（高/中/低）"
                 }}
             ]
         }}
 
-        要求：
-        1. 股票必须与行业分析直接相关
-        2. 只返回股票代码、名称、推荐理由、风险等级和影响程度
+        严格要求：
+        1. 股票必须严格属于{industry}行业，不能跨行业推荐
+        2. 推荐理由必须与{industry}行业直接相关
         3. 只返回JSON格式，不要其他文字
+        4. 确保股票代码和名称准确
         """
 
         completion = openai_client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "你是一个专业的股票分析师，请基于行业分析推荐相关股票。"},
+                {"role": "system", "content": f"你是一个专业的股票分析师，专门负责{industry}行业的股票推荐。请严格按照行业分类推荐股票，确保推荐的股票确实属于{industry}行业。"},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.3
+            temperature=0.2
         )
         
         response_text = completion.choices[0].message.content.strip()
@@ -372,51 +410,48 @@ def get_specific_stock_recommendations(industry, news_summary):
         try:
             import json
             result = json.loads(response_text)
-            return result.get("stocks", [])
+            stocks = result.get("stocks", [])
+            
+            # 验证股票是否属于该行业
+            validated_stocks = []
+            for stock in stocks:
+                # 简单的行业验证逻辑
+                if industry == "银行" and "银行" in stock.get("name", ""):
+                    validated_stocks.append(stock)
+                elif industry == "消费" and any(keyword in stock.get("name", "") for keyword in ["茅台", "五粮液", "海天", "伊利", "美的", "格力"]):
+                    validated_stocks.append(stock)
+                elif industry == "军工" and any(keyword in stock.get("name", "") for keyword in ["航空", "航天", "军工", "沈飞", "西飞"]):
+                    validated_stocks.append(stock)
+                elif industry == "新能源" and any(keyword in stock.get("name", "") for keyword in ["宁德", "比亚迪", "隆基", "阳光", "新能源"]):
+                    validated_stocks.append(stock)
+                elif industry == "医药" and any(keyword in stock.get("name", "") for keyword in ["医药", "医疗", "恒瑞", "迈瑞", "爱尔"]):
+                    validated_stocks.append(stock)
+                elif industry == "科技" and any(keyword in stock.get("name", "") for keyword in ["科技", "软件", "互联网", "腾讯", "阿里"]):
+                    validated_stocks.append(stock)
+                elif industry == "半导体" and any(keyword in stock.get("name", "") for keyword in ["半导体", "芯片", "中芯", "韦尔", "北方"]):
+                    validated_stocks.append(stock)
+                elif industry == "房地产" and any(keyword in stock.get("name", "") for keyword in ["万科", "保利", "招商", "金地", "房地产"]):
+                    validated_stocks.append(stock)
+                elif industry == "化工" and any(keyword in stock.get("name", "") for keyword in ["化工", "化学", "石化", "万华", "恒力"]):
+                    validated_stocks.append(stock)
+                elif industry == "汽车" and any(keyword in stock.get("name", "") for keyword in ["汽车", "上汽", "比亚迪", "长城", "长安"]):
+                    validated_stocks.append(stock)
+                else:
+                    # 对于其他行业，如果推荐理由包含行业关键词，则接受
+                    if industry in stock.get("reason", ""):
+                        validated_stocks.append(stock)
+            
+            return validated_stocks
+            
         except json.JSONDecodeError:
-            print(f"⚠️ AI返回格式错误，使用备用推荐")
-            return get_fallback_stocks(industry)
+            print(f"⚠️ AI返回格式错误，返回空列表")
+            return []
             
     except Exception as e:
         print(f"⚠️ 股票推荐失败: {e}")
-        return get_fallback_stocks(industry)
+        return []
 
-# 备用股票推荐（当动态推荐失败时使用）
-def get_fallback_stocks(industry):
-    """备用股票推荐模板"""
-    stock_templates = {
-        "新能源": [
-            {"code": "300750", "name": "宁德时代", "reason": "动力电池龙头，技术领先", "risk": "中", "impact": "高"},
-            {"code": "002594", "name": "比亚迪", "reason": "新能源汽车全产业链布局", "risk": "中", "impact": "高"},
-            {"code": "300274", "name": "阳光电源", "reason": "光伏逆变器龙头", "risk": "中", "impact": "中"}
-        ],
-        "半导体": [
-            {"code": "688981", "name": "中芯国际", "reason": "国内晶圆代工龙头", "risk": "高", "impact": "高"},
-            {"code": "002049", "name": "紫光国微", "reason": "安全芯片设计领先", "risk": "中", "impact": "中"},
-            {"code": "688536", "name": "思瑞浦", "reason": "模拟芯片设计", "risk": "高", "impact": "中"}
-        ],
-        "医药": [
-            {"code": "300015", "name": "爱尔眼科", "reason": "眼科医疗服务龙头", "risk": "低", "impact": "中"},
-            {"code": "600276", "name": "恒瑞医药", "reason": "创新药研发领先", "risk": "中", "impact": "高"},
-            {"code": "300760", "name": "迈瑞医疗", "reason": "医疗器械龙头", "risk": "低", "impact": "中"}
-        ],
-        "消费": [
-            {"code": "000858", "name": "五粮液", "reason": "白酒龙头，品牌价值高", "risk": "低", "impact": "中"},
-            {"code": "600519", "name": "贵州茅台", "reason": "白酒第一品牌", "risk": "低", "impact": "中"},
-            {"code": "002304", "name": "洋河股份", "reason": "白酒行业领先", "risk": "中", "impact": "中"}
-        ],
-        "科技": [
-            {"code": "000002", "name": "万科A", "reason": "房地产龙头", "risk": "高", "impact": "中"},
-            {"code": "000001", "name": "平安银行", "reason": "银行股龙头", "risk": "低", "impact": "中"},
-            {"code": "600036", "name": "招商银行", "reason": "零售银行领先", "risk": "低", "impact": "中"}
-        ]
-    }
-    return stock_templates.get(industry, [])
 
-# 生成股票推荐模板（保持向后兼容）
-def generate_stock_recommendations(industry):
-    """基于行业生成股票推荐模板（已废弃，使用get_dynamic_stock_recommendations）"""
-    return get_fallback_stocks(industry)
 
 # 全球事件联动分析系统
 def analyze_global_market_linkage(news_text):
@@ -609,12 +644,29 @@ if __name__ == "__main__":
     stock_recommendations = ""
     if related_industries:
         stock_recommendations = "## 🎯 A股投资机会\n\n"
+        used_stocks = set()  # 用于去重的股票代码集合
+        
         for industry in related_industries[:3]:  # 最多推荐3个行业
             print(f"🤖 正在为{industry}行业生成股票推荐...")
             stocks = get_specific_stock_recommendations(industry, summary)
             if stocks:
                 stock_recommendations += f"### 📈 {industry}板块\n"
-                for stock in stocks[:3]:  # 每个行业最多3只股票
+                industry_stock_count = 0  # 每个行业的股票计数
+                
+                for stock in stocks:
+                    # 检查是否已经推荐过这只股票
+                    stock_code = stock.get('code', '')
+                    if stock_code in used_stocks:
+                        print(f"⚠️ 跳过重复股票: {stock_code} {stock.get('name', '')}")
+                        continue
+                    
+                    # 检查是否达到每个行业的最大推荐数量
+                    if industry_stock_count >= 3:
+                        break
+                    
+                    used_stocks.add(stock_code)  # 添加到已使用集合
+                    industry_stock_count += 1
+                    
                     risk_emoji = {"低": "🟢", "中": "🟡", "高": "🔴"}.get(stock["risk"], "⚪")
                     impact_emoji = {"高": "🔥", "中": "⚡", "低": "💡"}.get(stock.get("impact", "中"), "💡")
                     stock_recommendations += f"- **{stock['code']} {stock['name']}** {risk_emoji} {impact_emoji}\n"
