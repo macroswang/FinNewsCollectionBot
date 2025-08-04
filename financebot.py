@@ -336,43 +336,42 @@ def get_specific_stock_recommendations(industries, stocks, news_summary):
     try:
         stock_list = ', '.join([f"{code} {name}" for code, name in stocks])
         industries_list = ', '.join(industries)
-        
+
         prompt = f"""
-        今日财经热点分析中涉及以下行业和股票：
-        行业：{industries_list}
-        股票：{stock_list}
+今日财经热点分析中涉及以下行业和股票：
+行业：{industries_list}
+股票：{stock_list}
 
-        新闻摘要：
-        {news_summary}
+新闻摘要：
+{news_summary}
 
-        请从以上给定的行业和股票范围内，严格按照以下要求推荐3-5只A股股票，并尽量准确识别未来1-3天可能热门的行业或股票，以便及时介入：
+请从以上给定的行业和股票范围内，严格按照以下要求推荐3-5只A股股票。
 
-        【推荐要求】：
-        1. 股票流通市值必须小于300亿元人民币。
-        2. 推荐理由必须详细结合新闻热点分析，并说明为何未来1-3天可能走热。
-        3. 严格按照以下JSON格式返回：
+【推荐要求】：
+1. 股票流通市值必须小于300亿元人民币。
+2. 根据AI生成的财经摘要，识别未来1-3天可能继续发酵的热点行业，并重点推荐这些行业中的潜力股票。
+3. 推荐理由必须详细结合新闻热点分析，并说明为何未来1-3天可能走热。
+4. 严格按照以下JSON格式返回：
 
+```json
+{{
+    "stocks": [
         {{
-            "stocks": [
-                {{
-                    "code": "股票代码",
-                    "name": "股票名称",
-                    "reason": "详细推荐理由（结合新闻热点及未来1-3天可能热门原因）",
-                    "risk": "风险等级（低/中/高）",
-                    "impact": "影响程度（高/中/低）"
-                }}
-            ]
+            "code": "股票代码",
+            "name": "股票名称",
+            "reason": "详细推荐理由（结合新闻热点及未来1-3天可能热门原因）",
+            "risk": "风险等级（低/中/高）",
+            "impact": "影响程度（高/中/低）"
         }}
-
-        【严禁】：
-        - 不要推荐给定范围以外的任何股票。
-        - 不要返回除JSON以外的任何其他内容。
-        """
+    ]
+}}
+```
+"""
 
         completion = openai_client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "你是专业股票分析师，严格遵守给定的行业和股票列表推荐个股，并确保股票流通市值小于300亿人民币，尽量预测未来1-3天可能热门股票。"},
+                {"role": "system", "content": "你是专业股票分析师，严格遵守给定的行业和股票列表推荐个股，并确保股票流通市值小于300亿人民币，识别未来1-3天可能继续发酵的热点行业或股票。"},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.1
