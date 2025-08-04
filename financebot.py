@@ -1507,7 +1507,7 @@ if __name__ == "__main__":
                         # 使用实时价格数据，如果技术指标不可用则使用当前价格
                         support_price = real_time_data.get('recent_low', real_time_data['current_price'])
                         resistance_price = real_time_data.get('recent_high', real_time_data['current_price'])
-                        new_stock_line += f"技术面：支撑位{support_price}元，阻力位{resistance_price}元（当前价{real_time_data['current_price']}元）。\n\n"
+                        new_stock_line += f"技术面：支撑位{support_price}元，阻力位{resistance_price}元（当前价{real_time_data['current_price']}元）。\n"
                         
                         # 在AI摘要中查找并替换对应的股票信息
                         old_pattern = f"**{stock['code']} {stock['name']}**"
