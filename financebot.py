@@ -302,10 +302,16 @@ def get_real_time_stock_data(stock_code, retries=3):
             volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
 
             info = stock.info
-            market_cap = info.get('marketCap', 'N/A')
+            shares_float = info.get("floatShares", None)
+            current_price_val = round(current_price, 2)
+            current_price = current_price_val  # for downstream code
+            if shares_float and current_price_val:
+                market_cap = shares_float * current_price_val
+            else:
+                market_cap = 'N/A'
 
             result = {
-                "current_price": round(current_price, 2),
+                "current_price": current_price_val,
                 "price_change": round(price_change, 2),
                 "volume_ratio": round(volume_ratio, 2),
                 "ma20": round(ma20, 2),
@@ -396,7 +402,7 @@ def get_specific_stock_recommendations(industries, stocks, news_summary):
             real_time_data = get_real_time_stock_data(stock["code"])
             if real_time_data and isinstance(real_time_data, dict) and all(key in real_time_data for key in ["current_price", "price_change", "recent_low", "recent_high"]):
                 market_cap = real_time_data["market_cap"]
-                if market_cap != 'N/A' and isinstance(market_cap, (int, float)) and market_cap < 3e10:
+                if isinstance(market_cap, (int, float)) and market_cap < 3e10:
                     stock.update({
                         "current_price": real_time_data["current_price"],
                         "price_change": real_time_data["price_change"],
