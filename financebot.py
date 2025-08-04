@@ -1492,51 +1492,30 @@ if __name__ == "__main__":
                 try:
                     real_time_data = get_real_time_stock_data(stock["code"])
                     if real_time_data:
-                        # 构建新的股票信息行，包含实时价格数据
+                        # 构建新的股票信息行
                         new_stock_line = f"**{stock['code']} {stock['name']}**\n"
                         new_stock_line += f"推荐理由：{stock['reason']}。\n"
                         new_stock_line += f"风险等级：{stock['risk']}。\n"
                         new_stock_line += f"短线潜力：{stock['short_term_potential']}。\n"
                         new_stock_line += f"持仓时间：{stock['holding_period']}。\n"
-                        
-                        # 添加实时价格信息
-                        price_change_emoji = "📈" if real_time_data["price_change"] > 0 else "📉" if real_time_data["price_change"] < 0 else "➡️"
-                        new_stock_line += f"**最新价格：¥{real_time_data['current_price']} {price_change_emoji} {real_time_data['price_change']}%**\n"
-                        
-                        # 添加技术面信息
-                        if real_time_data.get('recent_low') and real_time_data.get('recent_high'):
-                            new_stock_line += f"技术面：支撑位{real_time_data['recent_low']:.2f}元，阻力位{real_time_data['recent_high']:.2f}元（当前价{real_time_data['current_price']}元）。\n"
-                        else:
-                            new_stock_line += f"技术面：支撑位{real_time_data.get('recent_low', 'N/A')}元，阻力位{real_time_data.get('recent_high', 'N/A')}元（当前价{real_time_data['current_price']}元）。\n"
+                        # 使用实时价格数据，如果技术指标不可用则使用当前价格
+                        support_price = real_time_data.get('recent_low', real_time_data['current_price'])
+                        resistance_price = real_time_data.get('recent_high', real_time_data['current_price'])
+                        new_stock_line += f"技术面：支撑位{support_price}元，阻力位{resistance_price}元（当前价{real_time_data['current_price']}元）。\n"
                         
                         # 在AI摘要中查找并替换对应的股票信息
-                        # 尝试多种可能的格式匹配
-                        old_patterns = [
-                            f"**{stock['code']} {stock['name']}**",
-                            f"{stock['code']} {stock['name']}",
-                            f"**{stock['code']}**",
-                            f"{stock['code']}"
-                        ]
-                        
-                        pattern_found = False
-                        for old_pattern in old_patterns:
-                            if old_pattern in updated_summary:
-                                # 找到旧信息并替换
-                                import re
-                                # 使用更灵活的匹配模式，匹配包含该股票代码的整个段落
-                                # 匹配从股票代码开始到下一个股票代码、章节标题或段落结束的内容
-                                pattern = rf"{re.escape(old_pattern)}.*?(?=\*\*\d{{6}}\s+\w+|\n##|\n###|\n\n|\Z)"
-                                replacement = new_stock_line.rstrip()
-                                updated_summary = re.sub(pattern, replacement, updated_summary, flags=re.DOTALL)
-                                print(f"✅ 已更新 {stock['code']} {stock['name']} 的实时数据")
-                                pattern_found = True
-                                break
-                        
-                        if not pattern_found:
+                        old_pattern = f"**{stock['code']} {stock['name']}**"
+                        if old_pattern in updated_summary:
+                            # 找到旧信息并替换
+                            import re
+                            # 匹配从股票代码开始到下一个股票或段落结束的内容
+                            # 更精确的匹配模式：从股票代码开始到下一个股票代码或章节标题结束
+                            pattern = rf"{re.escape(old_pattern)}.*?(?=\*\*\d{{6}}\s+\w+|\n##|\n###|\Z)"
+                            replacement = new_stock_line.rstrip()
+                            updated_summary = re.sub(pattern, replacement, updated_summary, flags=re.DOTALL)
+                            print(f"✅ 已更新 {stock['code']} {stock['name']} 的实时数据")
+                        else:
                             print(f"⚠️ 在AI摘要中未找到 {stock['code']} {stock['name']} 的原始信息")
-                            # 尝试在摘要末尾添加新的股票信息
-                            updated_summary += f"\n{new_stock_line}\n"
-                            print(f"✅ 已在摘要末尾添加 {stock['code']} {stock['name']} 的实时数据")
                 except Exception as e:
                     print(f"⚠️ 更新 {stock['code']} 实时数据失败: {e}")
             
@@ -1545,51 +1524,30 @@ if __name__ == "__main__":
                 try:
                     real_time_data = get_real_time_stock_data(stock["code"])
                     if real_time_data:
-                        # 构建新的股票信息行，包含实时价格数据
+                        # 构建新的股票信息行
                         new_stock_line = f"**{stock['code']} {stock['name']}**\n"
                         new_stock_line += f"推荐理由：{stock['reason']}。\n"
                         new_stock_line += f"风险等级：{stock['risk']}。\n"
                         new_stock_line += f"短线潜力：{stock['short_term_potential']}。\n"
                         new_stock_line += f"持仓时间：{stock['holding_period']}。\n"
-                        
-                        # 添加实时价格信息
-                        price_change_emoji = "📈" if real_time_data["price_change"] > 0 else "📉" if real_time_data["price_change"] < 0 else "➡️"
-                        new_stock_line += f"**最新价格：¥{real_time_data['current_price']} {price_change_emoji} {real_time_data['price_change']}%**\n"
-                        
-                        # 添加技术面信息
-                        if real_time_data.get('recent_low') and real_time_data.get('recent_high'):
-                            new_stock_line += f"技术面：支撑位{real_time_data['recent_low']:.2f}元，阻力位{real_time_data['recent_high']:.2f}元（当前价{real_time_data['current_price']}元）。\n"
-                        else:
-                            new_stock_line += f"技术面：支撑位{real_time_data.get('recent_low', 'N/A')}元，阻力位{real_time_data.get('recent_high', 'N/A')}元（当前价{real_time_data['current_price']}元）。\n"
+                        # 使用实时价格数据，如果技术指标不可用则使用当前价格
+                        support_price = real_time_data.get('recent_low', real_time_data['current_price'])
+                        resistance_price = real_time_data.get('recent_high', real_time_data['current_price'])
+                        new_stock_line += f"技术面：支撑位{support_price}元，阻力位{resistance_price}元（当前价{real_time_data['current_price']}元）。\n"
                         
                         # 在AI摘要中查找并替换对应的股票信息
-                        # 尝试多种可能的格式匹配
-                        old_patterns = [
-                            f"**{stock['code']} {stock['name']}**",
-                            f"{stock['code']} {stock['name']}",
-                            f"**{stock['code']}**",
-                            f"{stock['code']}"
-                        ]
-                        
-                        pattern_found = False
-                        for old_pattern in old_patterns:
-                            if old_pattern in updated_summary:
-                                # 找到旧信息并替换
-                                import re
-                                # 匹配从股票代码开始到下一个股票或段落结束的内容
-                                # 更精确的匹配模式：从股票代码开始到下一个股票代码或章节标题结束
-                                pattern = rf"{re.escape(old_pattern)}.*?(?=\*\*\d{{6}}\s+\w+|\n##|\n###|\Z)"
-                                replacement = new_stock_line.rstrip()
-                                updated_summary = re.sub(pattern, replacement, updated_summary, flags=re.DOTALL)
-                                print(f"✅ 已更新 {stock['code']} {stock['name']} 的实时数据")
-                                pattern_found = True
-                                break
-                        
-                        if not pattern_found:
+                        old_pattern = f"**{stock['code']} {stock['name']}**"
+                        if old_pattern in updated_summary:
+                            # 找到旧信息并替换
+                            import re
+                            # 匹配从股票代码开始到下一个股票或段落结束的内容
+                            # 更精确的匹配模式：从股票代码开始到下一个股票代码或章节标题结束
+                            pattern = rf"{re.escape(old_pattern)}.*?(?=\*\*\d{{6}}\s+\w+|\n##|\n###|\Z)"
+                            replacement = new_stock_line.rstrip()
+                            updated_summary = re.sub(pattern, replacement, updated_summary, flags=re.DOTALL)
+                            print(f"✅ 已更新 {stock['code']} {stock['name']} 的实时数据")
+                        else:
                             print(f"⚠️ 在AI摘要中未找到 {stock['code']} {stock['name']} 的原始信息")
-                            # 尝试在摘要末尾添加新的股票信息
-                            updated_summary += f"\n{new_stock_line}\n"
-                            print(f"✅ 已在摘要末尾添加 {stock['code']} {stock['name']} 的实时数据")
                 except Exception as e:
                     print(f"⚠️ 更新 {stock['code']} 实时数据失败: {e}")
         
