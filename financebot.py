@@ -315,6 +315,15 @@ def get_real_time_stock_data(stock_code, retries=3):
                 "market_cap": market_cap,
             }
 
+            # Add pe_ratio and pb_ratio to result
+            pe_ratio = info.get('trailingPE', 'N/A')
+            pb_ratio = info.get('priceToBook', 'N/A')
+
+            result.update({
+                "pe_ratio": pe_ratio,
+                "pb_ratio": pb_ratio
+            })
+
             return result
         except Exception as e:
             print(f"⚠️ 获取{stock_code}数据失败: {e}, 重试第{attempt+1}次")
@@ -377,11 +386,9 @@ def get_specific_stock_recommendations(industries, stocks, news_summary):
 
         for stock in stocks_recommended:
             real_time_data = get_real_time_stock_data(stock["code"])
-            if real_time_data:
-                # 检查流通市值是否满足小于300亿
+            if real_time_data and isinstance(real_time_data, dict) and all(key in real_time_data for key in ["current_price", "price_change", "recent_low", "recent_high"]):
                 market_cap = real_time_data["market_cap"]
-                if market_cap != 'N/A' and market_cap < 3e10:
-                    # 添加实时数据到推荐股票中
+                if market_cap != 'N/A' and isinstance(market_cap, (int, float)) and market_cap < 3e10:
                     stock.update({
                         "current_price": real_time_data["current_price"],
                         "price_change": real_time_data["price_change"],
@@ -393,9 +400,9 @@ def get_specific_stock_recommendations(industries, stocks, news_summary):
                     })
                     final_stocks.append(stock)
                 else:
-                    print(f"⚠️股票 {stock['name']} 流通市值超限 ({market_cap})，已剔除。")
+                    print(f"⚠️股票 {stock['name']} 流通市值超限或格式错误 ({market_cap})，已剔除。")
             else:
-                print(f"⚠️股票 {stock['name']} 实时数据获取失败，已剔除。")
+                print(f"⚠️股票 {stock['name']} 实时数据不完整或格式异常，已剔除。")
 
         return final_stocks
 
