@@ -348,107 +348,89 @@ def get_real_time_stock_data(stock_code):
         print(f"❌ 获取{stock_code}实时数据失败: {e}")
         return None
 
-# 获取具体股票推荐（增强版）
-def get_specific_stock_recommendations(industry, news_summary):
-    """基于行业和新闻摘要获取具体股票推荐，包含实时基本面、技术面和买卖点分析"""
+# 获取具体股票推荐（增强版，严格流通市值<300亿，提前识别热门）
+def get_specific_stock_recommendations(industries, stocks, news_summary):
+    """基于今日分析总结严格推荐股票（流通市值<300亿），并提前识别未来1-3天可能热门的行业或股票"""
     try:
-        # 根据行业提供具体的股票推荐指导
-        industry_guidance = {
-            "银行": "推荐银行板块龙头股，如工商银行、建设银行、农业银行、中国银行等",
-            "消费": "推荐消费板块龙头股，如贵州茅台、五粮液、海天味业、伊利股份等",
-            "科技": "推荐科技板块龙头股，如腾讯、阿里巴巴、百度、美团等",
-            "新能源": "推荐新能源板块龙头股，如宁德时代、比亚迪、隆基绿能、阳光电源等",
-            "医药": "推荐医药板块龙头股，如恒瑞医药、迈瑞医疗、爱尔眼科、药明康德等",
-            "军工": "推荐军工板块龙头股，如中航沈飞、中航西飞、航天电子、中国重工等",
-            "半导体": "推荐半导体板块龙头股，如中芯国际、韦尔股份、北方华创、紫光国微等",
-            "房地产": "推荐房地产板块龙头股，如万科A、保利发展、招商蛇口、金地集团等",
-            "化工": "推荐化工板块龙头股，如万华化学、恒力石化、荣盛石化、桐昆股份等",
-            "汽车": "推荐汽车板块龙头股，如上汽集团、比亚迪、长城汽车、长安汽车等"
-        }
-        
-        guidance = industry_guidance.get(industry, f"推荐{industry}板块的龙头股票")
+        stock_list = ', '.join([f"{code} {name}" for code, name in stocks])
+        industries_list = ', '.join(industries)
         
         prompt = f"""
-        基于以下{industry}行业的新闻分析，推荐3-5只最相关的A股股票：
+        今日财经热点分析中涉及以下行业和股票：
+        行业：{industries_list}
+        股票：{stock_list}
 
-        行业分析：{news_summary}
-        
-        推荐要求：
-        {guidance}
-        
-        请严格按照以下格式返回JSON：
+        新闻摘要：
+        {news_summary}
+
+        请从以上给定的行业和股票范围内，严格按照以下要求推荐3-5只A股股票，并尽量准确识别未来1-3天可能热门的行业或股票，以便及时介入：
+
+        【推荐要求】：
+        1. 股票流通市值必须小于300亿元人民币。
+        2. 推荐理由必须详细结合新闻热点分析，并说明为何未来1-3天可能走热。
+        3. 严格按照以下JSON格式返回：
+
         {{
             "stocks": [
                 {{
                     "code": "股票代码",
-                    "name": "股票名称", 
-                    "reason": "推荐理由（必须与{industry}行业直接相关）",
+                    "name": "股票名称",
+                    "reason": "详细推荐理由（结合新闻热点及未来1-3天可能热门原因）",
                     "risk": "风险等级（低/中/高）",
                     "impact": "影响程度（高/中/低）"
                 }}
             ]
         }}
 
-        严格要求：
-        1. 股票必须严格属于{industry}行业，不能跨行业推荐
-        2. 推荐理由必须与{industry}行业直接相关
-        3. 只返回JSON格式，不要其他文字
-        4. 确保股票代码和名称准确
+        【严禁】：
+        - 不要推荐给定范围以外的任何股票。
+        - 不要返回除JSON以外的任何其他内容。
         """
 
         completion = openai_client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": f"你是一个专业的股票分析师，专门负责{industry}行业的股票推荐。请严格按照行业分类推荐股票，确保推荐的股票确实属于{industry}行业。"},
+                {"role": "system", "content": "你是专业股票分析师，严格遵守给定的行业和股票列表推荐个股，并确保股票流通市值小于300亿人民币，尽量预测未来1-3天可能热门股票。"},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.2
+            temperature=0.1
         )
-        
+
         response_text = completion.choices[0].message.content.strip()
-        
-        try:
-            import json
-            result = json.loads(response_text)
-            stocks = result.get("stocks", [])
-            
-            # 验证股票是否属于该行业
-            validated_stocks = []
-            for stock in stocks:
-                # 简单的行业验证逻辑
-                if industry == "银行" and "银行" in stock.get("name", ""):
-                    validated_stocks.append(stock)
-                elif industry == "消费" and any(keyword in stock.get("name", "") for keyword in ["茅台", "五粮液", "海天", "伊利", "美的", "格力"]):
-                    validated_stocks.append(stock)
-                elif industry == "军工" and any(keyword in stock.get("name", "") for keyword in ["航空", "航天", "军工", "沈飞", "西飞"]):
-                    validated_stocks.append(stock)
-                elif industry == "新能源" and any(keyword in stock.get("name", "") for keyword in ["宁德", "比亚迪", "隆基", "阳光", "新能源"]):
-                    validated_stocks.append(stock)
-                elif industry == "医药" and any(keyword in stock.get("name", "") for keyword in ["医药", "医疗", "恒瑞", "迈瑞", "爱尔"]):
-                    validated_stocks.append(stock)
-                elif industry == "科技" and any(keyword in stock.get("name", "") for keyword in ["科技", "软件", "互联网", "腾讯", "阿里"]):
-                    validated_stocks.append(stock)
-                elif industry == "半导体" and any(keyword in stock.get("name", "") for keyword in ["半导体", "芯片", "中芯", "韦尔", "北方"]):
-                    validated_stocks.append(stock)
-                elif industry == "房地产" and any(keyword in stock.get("name", "") for keyword in ["万科", "保利", "招商", "金地", "房地产"]):
-                    validated_stocks.append(stock)
-                elif industry == "化工" and any(keyword in stock.get("name", "") for keyword in ["化工", "化学", "石化", "万华", "恒力"]):
-                    validated_stocks.append(stock)
-                elif industry == "汽车" and any(keyword in stock.get("name", "") for keyword in ["汽车", "上汽", "比亚迪", "长城", "长安"]):
-                    validated_stocks.append(stock)
+
+        import json
+        stocks_recommended = json.loads(response_text).get("stocks", [])
+        final_stocks = []
+
+        for stock in stocks_recommended:
+            real_time_data = get_real_time_stock_data(stock["code"])
+            if real_time_data:
+                # 检查流通市值是否满足小于300亿
+                market_cap = real_time_data["market_cap"]
+                if market_cap != 'N/A' and market_cap < 3e10:
+                    # 添加实时数据到推荐股票中
+                    stock.update({
+                        "current_price": real_time_data["current_price"],
+                        "price_change": real_time_data["price_change"],
+                        "support": real_time_data["recent_low"],
+                        "resistance": real_time_data["recent_high"],
+                        "buy_point": round(real_time_data["current_price"] * 0.95, 2),
+                        "stop_loss": round(real_time_data["current_price"] * 0.92, 2),
+                        "target_price": round(real_time_data["current_price"] * 1.15, 2)
+                    })
+                    final_stocks.append(stock)
                 else:
-                    # 对于其他行业，如果推荐理由包含行业关键词，则接受
-                    if industry in stock.get("reason", ""):
-                        validated_stocks.append(stock)
-            
-            return validated_stocks
-            
-        except json.JSONDecodeError:
-            print(f"⚠️ AI返回格式错误，返回空列表")
-            return []
-            
+                    print(f"⚠️股票 {stock['name']} 流通市值超限 ({market_cap})，已剔除。")
+            else:
+                print(f"⚠️股票 {stock['name']} 实时数据获取失败，已剔除。")
+
+        return final_stocks
+
+    except json.JSONDecodeError:
+        print("⚠️AI返回JSON解析失败")
+        return []
     except Exception as e:
-        print(f"⚠️ 股票推荐失败: {e}")
+        print(f"⚠️股票推荐出错: {e}")
         return []
 
 
