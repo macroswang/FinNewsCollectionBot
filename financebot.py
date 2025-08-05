@@ -280,16 +280,26 @@ def generate_ai_analysis(news_text):
 - 仓位控制建议
 - 止盈止损策略
 
-要求：
+**关键约束条件：**
 - 只推荐A股（6位数字代码）
 - 分析资金流向和情绪变化
 - 重点关注板块轮动和热点切换
 - 优先选择适合短线交易的股票（流动性好、波动适中）
 - 优先推荐中小盘股票（市值≤500亿）
 - 严禁推荐ST股票、*ST股票或退市、科创版和北交所股票
-- 只推荐正常交易的主板、中小板、创业板股票，不要推荐ST股票、*ST股票或退市、科创版和北交所股票
-- 提供具体操作建议
-- 1-5个交易日操作周期
+- 只推荐正常交易的主板、中小板、创业板股票
+- 提供具体操作建议，1-5个交易日操作周期
+
+**重要：买入价格约束**
+- 推荐的买入价格必须在当前股价的±10%范围内
+- 支撑位/买入点必须是近期（1-5个交易日）可能触及的价格
+- 不能推荐需要等待股价大幅下跌才能介入的股票
+- 买入策略应该是：当前价附近、回调5-10%时、突破某阻力位等近期可操作的时机
+- 如果股票当前价格不适合短线介入，则不要推荐该股票
+
+**买入时机描述示例：**
+正确：当前价附近分批建仓、回调3-5%时加仓、突破20日线时追入
+错误：跌至XX元（远低于当前价）时介入、等待大幅回调后买入
                 """},
                 {"role": "user", "content": f"新闻内容：{news_text}"}
             ],
@@ -305,8 +315,58 @@ def extract_stock_codes(text):
     pattern = r'\b\d{6}\b'
     return re.findall(pattern, text)
 
+def validate_buy_price_reasonableness(stock_line, current_price):
+    """验证买入价格的合理性"""
+    try:
+        # 提取买入价格相关的文本
+        price_patterns = [
+            r'(\d+\.?\d*)元[附近买入|买入|介入]',  # XX元买入/介入
+            r'[回调至|跌至|支撑位](\d+\.?\d*)元',  # 回调至XX元
+            r'(\d+\.?\d*)[元]?[附近|左右|上下]',   # XX元附近
+            r'支撑[位]?[：:]?(\d+\.?\d*)',       # 支撑位XX
+        ]
+        
+        buy_prices = []
+        for pattern in price_patterns:
+            matches = re.findall(pattern, stock_line)
+            for match in matches:
+                try:
+                    price = float(match)
+                    if 1 <= price <= 1000:  # 合理的股价范围
+                        buy_prices.append(price)
+                except ValueError:
+                    continue
+        
+        if not buy_prices:
+            # 如果没有找到具体价格，检查是否有明显不合理的描述
+            unreasonable_phrases = [
+                r'跌至\d+元', r'等待.*回调', r'大幅下跌', 
+                r'深度回调', r'等.*跌破', r'破位.*买入'
+            ]
+            for phrase in unreasonable_phrases:
+                if re.search(phrase, stock_line):
+                    print(f"❌ 发现不合理买入描述: {phrase}")
+                    return False
+            return True  # 没有具体价格但也没有不合理描述，暂时通过
+        
+        # 检查价格合理性
+        for buy_price in buy_prices:
+            price_diff_percent = abs(buy_price - current_price) / current_price * 100
+            if price_diff_percent > 15:  # 超过15%认为不合理
+                print(f"❌ 买入价格 {buy_price}元 与当前价格 {current_price}元 差距过大: {price_diff_percent:.1f}%")
+                return False
+            elif buy_price < current_price * 0.85:  # 低于当前价85%认为不合理
+                print(f"❌ 买入价格 {buy_price}元 过低，当前价格 {current_price}元")
+                return False
+                
+        return True
+        
+    except Exception as e:
+        print(f"⚠️ 价格合理性验证失败: {e}")
+        return True  # 验证失败时默认通过
+
 def update_stock_data_in_text(text):
-    """更新文本中股票的实时数据"""
+    """更新文本中股票的实时数据并验证推荐合理性"""
     stock_codes = extract_stock_codes(text)
     updated_text = text
     
@@ -330,18 +390,78 @@ def update_stock_data_in_text(text):
         # 获取实时数据
         data = get_real_time_stock_data(code)
         if data:
+            current_price = data['current_price']
+            
+            # 查找该股票的推荐行
+            stock_line_pattern = rf'- {code}[^-\n]*(?:\n(?!\s*-)[^\n]*)*'
+            stock_line_match = re.search(stock_line_pattern, updated_text, re.MULTILINE)
+            
+            if stock_line_match:
+                stock_line = stock_line_match.group(0)
+                
+                # 验证买入价格合理性
+                if not validate_buy_price_reasonableness(stock_line, current_price):
+                    print(f"❌ {code} 买入价格不合理，已过滤")
+                    # 从文本中移除这个股票代码的推荐
+                    updated_text = updated_text.replace(stock_line, '')
+                    continue
+            
             # 在股票代码后添加实时价格信息
             price_emoji = "📈" if data["price_change"] > 0 else "📉" if data["price_change"] < 0 else "➡️"
-            price_info = f"（当前价：¥{data['current_price']} {price_emoji}{data['price_change']}%）"
+            price_info = f"（当前价：¥{current_price} {price_emoji}{data['price_change']}%）"
             
             # 替换文本中的股票代码，添加价格信息
             pattern = rf'\b{code}\b(?!\s*（当前价：)'  # 避免重复添加
             replacement = f"{code}{price_info}"
             updated_text = re.sub(pattern, replacement, updated_text)
             
-            print(f"✅ 已更新 {code} 实时数据")
+            print(f"✅ 已更新 {code} 实时数据，买入价格合理")
+        else:
+            print(f"❌ {code} 无法获取实时数据，已过滤")
+            # 从文本中移除这个股票代码的推荐
+            pattern = rf'- {code}[^\n]*\n?'
+            updated_text = re.sub(pattern, '', updated_text)
+    
+    # 清理空的推荐部分
+    updated_text = clean_empty_sections(updated_text)
     
     return updated_text
+
+def clean_empty_sections(text):
+    """清理空的推荐部分"""
+    lines = text.split('\n')
+    cleaned_lines = []
+    skip_next_empty = False
+    
+    for i, line in enumerate(lines):
+        # 如果是子标题行（### 开头）
+        if line.startswith('### '):
+            # 检查后面是否有实际的推荐内容
+            has_content = False
+            for j in range(i + 1, len(lines)):
+                if lines[j].startswith('### ') or lines[j].startswith('## '):
+                    break
+                if lines[j].strip() and lines[j].startswith('- '):
+                    has_content = True
+                    break
+            
+            if has_content:
+                cleaned_lines.append(line)
+            else:
+                skip_next_empty = True
+        # 如果是主标题行（## 开头）
+        elif line.startswith('## '):
+            cleaned_lines.append(line)
+            skip_next_empty = False
+        # 如果是空行且前面的部分被跳过了
+        elif not line.strip() and skip_next_empty:
+            skip_next_empty = False
+            continue
+        else:
+            cleaned_lines.append(line)
+            skip_next_empty = False
+    
+    return '\n'.join(cleaned_lines)
 
 def get_market_indices():
     """获取主要指数数据"""
