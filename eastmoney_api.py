@@ -17,6 +17,25 @@ class EastMoneyAPI:
             'Accept': 'application/json, text/plain, */*',
         })
     
+    def is_trading_time(self):
+        """判断当前是否为A股交易时间"""
+        now = datetime.now()
+        
+        # 判断是否为工作日
+        if now.weekday() >= 5:  # 周六、周日
+            return False
+        
+        # 判断是否为交易时间
+        # 上午：9:30-11:30
+        # 下午：13:00-15:00
+        current_time = now.time()
+        morning_start = datetime.strptime('09:30:00', '%H:%M:%S').time()
+        morning_end = datetime.strptime('11:30:00', '%H:%M:%S').time()
+        afternoon_start = datetime.strptime('13:00:00', '%H:%M:%S').time()
+        afternoon_end = datetime.strptime('15:00:00', '%H:%M:%S').time()
+        
+        return (morning_start <= current_time <= morning_end) or (afternoon_start <= current_time <= afternoon_end)
+    
     def get_stock_info(self, stock_code):
         """获取股票基本信息"""
         try:
@@ -44,10 +63,28 @@ class EastMoneyAPI:
             if data.get('rc') == 0 and data.get('data'):
                 stock_data = data['data']
                 
+                # 获取前一日收盘价
+                prev_close = stock_data.get('f18', 0) / 100 if stock_data.get('f18', 0) > 0 else 0
+                
                 # 处理价格数据（东方财富的价格数据需要除以100）
-                current_price = stock_data.get('f2', 0) / 100 if stock_data.get('f2', 0) > 0 else 0
+                current_price_raw = stock_data.get('f2', 0) / 100 if stock_data.get('f2', 0) > 0 else 0
                 price_change = stock_data.get('f4', 0) / 100
                 price_change_pct = stock_data.get('f3', 0) / 100
+                
+                # 在非交易时间，如果当前价格为0，使用前一日收盘价
+                if current_price_raw == 0 and prev_close > 0:
+                    current_price = prev_close
+                    # 获取前一个交易日的涨跌幅
+                    prev_day_change = self._get_prev_trading_day_change(stock_code)
+                    if prev_day_change is not None:
+                        price_change = prev_day_change['price_change']
+                        price_change_pct = prev_day_change['price_change_pct']
+                    else:
+                        # 如果无法获取前一日数据，使用0
+                        price_change = 0
+                        price_change_pct = 0
+                else:
+                    current_price = current_price_raw
                 
                 # 处理市值数据（使用f45字段，总市值，单位：万元）
                 market_cap_raw = stock_data.get('f45', 0)
@@ -72,7 +109,8 @@ class EastMoneyAPI:
                     'high': stock_data.get('f15', 0) / 100 if stock_data.get('f15', 0) > 0 else 0,
                     'low': stock_data.get('f16', 0) / 100 if stock_data.get('f16', 0) > 0 else 0,
                     'open': stock_data.get('f17', 0) / 100 if stock_data.get('f17', 0) > 0 else 0,
-                    'prev_close': stock_data.get('f18', 0) / 100 if stock_data.get('f18', 0) > 0 else 0,
+                    'prev_close': prev_close,
+                    'is_trading_time': self.is_trading_time(),
                 }
             else:
                 print(f"❌ 获取{stock_code}基本信息失败")
@@ -82,6 +120,29 @@ class EastMoneyAPI:
             print(f"❌ 获取{stock_code}基本信息异常: {e}")
             return None
     
+    def _get_prev_trading_day_change(self, stock_code):
+        """获取前一个交易日的涨跌幅数据"""
+        try:
+            # 获取最近2天的历史数据
+            history_data = self.get_stock_history(stock_code, days=2)
+            if history_data and len(history_data) >= 2:
+                # 获取前一个交易日的收盘价和前一日的收盘价
+                prev_close = history_data[-1]['close']  # 前一个交易日
+                prev_prev_close = history_data[-2]['close']  # 前前一个交易日
+                
+                # 计算前一个交易日的涨跌幅
+                price_change = prev_close - prev_prev_close
+                price_change_pct = (price_change / prev_prev_close) * 100 if prev_prev_close > 0 else 0
+                
+                return {
+                    'price_change': round(price_change, 2),
+                    'price_change_pct': round(price_change_pct, 2)
+                }
+            return None
+        except Exception as e:
+            print(f"❌ 获取{stock_code}前一日涨跌幅异常: {e}")
+            return None
+
     def get_stock_history(self, stock_code, days=60):
         """获取股票历史数据"""
         try:
