@@ -377,14 +377,17 @@ def main():
     print("📊 正在获取市场指数...")
     market_indices = get_market_indices()
     
+    print("🔍 分析文本：", analysis_text)
     # 生成AI分析
     print("🤖 正在生成AI分析...")
     ai_analysis = generate_ai_analysis(analysis_text)
     
+    print("🔍 AI分析内容结果：", ai_analysis)
     # 更新股票实时数据
     print("📈 正在更新股票实时数据...")
     updated_analysis = update_stock_data_in_text(ai_analysis)
     
+    print("🔍 AI分析总结：", updated_analysis)
     # 构建最终消息
     indices_section = "## 📈 实时市场指数\n"
     for name, value in market_indices.items():
