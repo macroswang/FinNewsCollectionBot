@@ -4,6 +4,11 @@ requests
 newspaper3k
 pytz
 lxml_html_clean
-yfinance
-pandas
 lxml
+pandas==2.3.1
+numpy==1.26.4
+protobuf==4.25.3
+websockets==10.4
+multitasking==0.0.9
+platformdirs==3.10.0
+frozendict==2.3.4
