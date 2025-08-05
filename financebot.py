@@ -148,8 +148,7 @@ def get_real_time_stock_data(stock_code):
             "recent_high": round(recent_high, 2),
             "recent_low": round(recent_low, 2),
             "pe_ratio": stock_info.get('pe_ratio', 'N/A'),
-            "market_cap": stock_info.get('market_cap', 0),
-            "is_trading_time": stock_info.get('is_trading_time', False)
+            "market_cap": stock_info.get('market_cap', 0)
         }
         
     except Exception as e:
@@ -379,29 +378,8 @@ def update_stock_data_in_text(text):
                     continue
             
             # 在股票代码后添加实时价格信息
-            # 根据是否为交易时间来决定显示格式
-            is_trading_time = data.get('is_trading_time', False)
-            
-            if is_trading_time:
-                # 交易时间：显示当前价
-                price_emoji = "📈" if data["price_change"] > 0 else "📉" if data["price_change"] < 0 else "➡️"
-                price_info = f"（当前价：¥{current_price} {price_emoji}{data['price_change']}%）"
-            else:
-                # 非交易时间：显示前收盘价和前一日涨跌幅
-                if data["price_change"] == 0 and current_price > 0:
-                    # 尝试获取前一日涨跌幅
-                    from eastmoney_api import eastmoney_api
-                    prev_day_change = eastmoney_api._get_prev_trading_day_change(code)
-                    if prev_day_change:
-                        prev_price_change = prev_day_change['price_change_pct']
-                        price_emoji = "📈" if prev_price_change > 0 else "📉" if prev_price_change < 0 else "➡️"
-                        price_info = f"（前收盘：¥{current_price} {price_emoji}{prev_price_change:+.2f}%）"
-                    else:
-                        price_emoji = "➡️"
-                        price_info = f"（前收盘：¥{current_price} {price_emoji}0.00%）"
-                else:
-                    price_emoji = "📈" if data["price_change"] > 0 else "📉" if data["price_change"] < 0 else "➡️"
-                    price_info = f"（前收盘：¥{current_price} {price_emoji}{data['price_change']}%）"
+            price_emoji = "📈" if data["price_change"] > 0 else "📉" if data["price_change"] < 0 else "➡️"
+            price_info = f"（当前价：¥{current_price} {price_emoji}{data['price_change']}%）"
             
             # 替换文本中的股票代码，添加价格信息
             pattern = rf'\b{code}\b(?!\s*（当前价：)'  # 避免重复添加
