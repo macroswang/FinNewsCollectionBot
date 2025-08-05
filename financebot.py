@@ -8,7 +8,7 @@ import pytz
 import os
 import json
 import re
-from eastmoney_api import eastmoney_api
+import yfinance as yf
 from openai import OpenAI
 
 # 环境变量配置
@@ -115,40 +115,44 @@ def collect_news_data(rss_feeds, max_articles=3):
 def get_real_time_stock_data(stock_code):
     """获取股票实时数据"""
     try:
-        # 使用东方财富API获取股票信息
-        stock_info = eastmoney_api.get_stock_info(stock_code)
-        if not stock_info:
-            print(f"❌ 获取{stock_code}数据失败")
+        # 转换A股代码格式
+        if stock_code.startswith('6'):
+            ticker = f"{stock_code}.SS"
+        else:
+            ticker = f"{stock_code}.SZ"
+        
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period="2mo")
+        
+        if hist.empty:
             return None
             
-        current_price = stock_info['current_price']
-        price_change_pct = stock_info['price_change_pct']
+        current_price = hist['Close'].iloc[-1]
+        prev_price = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
+        price_change = ((current_price - prev_price) / prev_price) * 100
         
-        # 获取历史数据计算技术指标
-        history_data = eastmoney_api.get_stock_history(stock_code, days=60)
-        if history_data and len(history_data) >= 20:
-            # 计算MA20
-            closes = [item['close'] for item in history_data[-20:]]
-            ma20 = sum(closes) / len(closes)
-            
-            # 计算近期高低点
-            highs = [item['high'] for item in history_data[-20:]]
-            lows = [item['low'] for item in history_data[-20:]]
-            recent_high = max(highs)
-            recent_low = min(lows)
-        else:
-            ma20 = current_price
-            recent_high = current_price
-            recent_low = current_price
+        # 计算技术指标
+        ma20 = hist['Close'].rolling(window=20).mean().iloc[-1] if len(hist) >= 20 else current_price
+        recent_high = hist['High'].tail(20).max()
+        recent_low = hist['Low'].tail(20).min()
+        
+        # 获取基本面数据
+        try:
+            info = stock.info
+            market_cap = info.get('marketCap', 0)
+            pe_ratio = info.get('trailingPE', 'N/A')
+        except:
+            market_cap = 0
+            pe_ratio = 'N/A'
         
         return {
             "current_price": round(current_price, 2),
-            "price_change": round(price_change_pct, 2),
+            "price_change": round(price_change, 2),
             "ma20": round(ma20, 2),
             "recent_high": round(recent_high, 2),
             "recent_low": round(recent_low, 2),
-            "pe_ratio": stock_info.get('pe_ratio', 'N/A'),
-            "market_cap": stock_info.get('market_cap', 0)
+            "pe_ratio": pe_ratio,
+            "market_cap": market_cap
         }
         
     except Exception as e:
@@ -158,29 +162,54 @@ def get_real_time_stock_data(stock_code):
 def check_market_cap(stock_code, max_cap_billion=500):
     """检查股票市值是否符合中小盘标准"""
     try:
-        stock_info = eastmoney_api.get_stock_info(stock_code)
-        if stock_info and stock_info.get('market_cap'):
-            market_cap_billion = stock_info["market_cap"] / 100000000  # 转换为亿元
-            if market_cap_billion > max_cap_billion:
-                print(f"❌ {stock_code} 市值超标 ({market_cap_billion:.1f}亿 > {max_cap_billion}亿)，已过滤")
-                return False
-            return True
-        # 无法获取市值数据时，可能是网络问题，默认通过
-        print(f"⚠️ {stock_code} 无法获取市值数据，可能是网络问题，默认通过")
+        data = get_real_time_stock_data(stock_code)
+        if data and data.get("market_cap"):
+            market_cap_billion = data["market_cap"] / 100000000  # 转换为亿元
+            return market_cap_billion <= max_cap_billion
+        return True  # 无法获取时默认通过
+    except:
         return True
-    except Exception as e:
-        print(f"⚠️ {stock_code} 市值检查异常: {e}，默认通过")
-        return True  # 异常时默认通过
 
 def is_st_or_delisted_stock(stock_code):
     """检查股票是否为ST股票或退市股票"""
     try:
-        # 使用东方财富API检查ST状态
-        if eastmoney_api.check_st_stock(stock_code):
-            return True
+        # 转换A股代码格式
+        if stock_code.startswith('6'):
+            ticker = f"{stock_code}.SS"
+        else:
+            ticker = f"{stock_code}.SZ"
         
-        # 检查是否为退市股票
-        if eastmoney_api.check_delisted_stock(stock_code):
+        stock = yf.Ticker(ticker)
+        
+        # 尝试获取股票信息
+        try:
+            info = stock.info
+            stock_name = info.get('longName', '') or info.get('shortName', '')
+            
+            # 检查股票名称是否包含ST标记
+            if stock_name and ('ST' in stock_name.upper() or '*ST' in stock_name.upper()):
+                print(f"❌ {stock_code} 为ST股票: {stock_name}")
+                return True
+                
+        except Exception:
+            # 无法获取股票信息，可能已退市
+            pass
+        
+        # 检查是否能获取到近期交易数据
+        try:
+            hist = stock.history(period="5d")
+            if hist.empty:
+                print(f"❌ {stock_code} 无交易数据，可能已退市")
+                return True
+                
+            # 检查最近是否有交易量
+            recent_volume = hist['Volume'].tail(3).sum()
+            if recent_volume == 0:
+                print(f"❌ {stock_code} 近期无交易量，可能已停牌或退市")
+                return True
+                
+        except Exception:
+            print(f"❌ {stock_code} 数据获取异常，可能已退市")
             return True
             
         return False
@@ -437,7 +466,29 @@ def clean_empty_sections(text):
 def get_market_indices():
     """获取主要指数数据"""
     try:
-        return eastmoney_api.get_market_indices()
+        indices = {
+            "上证指数": "000001.SS",
+            "深证成指": "399001.SZ", 
+            "创业板指": "399006.SZ"
+        }
+        
+        market_data = {}
+        for name, code in indices.items():
+            try:
+                stock = yf.Ticker(code)
+                hist = stock.history(period="1d")
+                if not hist.empty:
+                    current_price = hist['Close'].iloc[-1]
+                    prev_close = hist['Open'].iloc[-1]
+                    change = ((current_price - prev_close) / prev_close) * 100
+                    emoji = "📈" if change > 0 else "📉" if change < 0 else "➡️"
+                    market_data[name] = f"{emoji} {current_price:.2f} ({change:+.2f}%)"
+                else:
+                    market_data[name] = "📊 数据获取中"
+            except Exception:
+                market_data[name] = "❌ 数据获取失败"
+        
+        return market_data
     except Exception:
         return {"市场数据": "❌ 获取失败"}
 
