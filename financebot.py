@@ -170,6 +170,54 @@ def check_market_cap(stock_code, max_cap_billion=500):
     except:
         return True
 
+def is_st_or_delisted_stock(stock_code):
+    """检查股票是否为ST股票或退市股票"""
+    try:
+        # 转换A股代码格式
+        if stock_code.startswith('6'):
+            ticker = f"{stock_code}.SS"
+        else:
+            ticker = f"{stock_code}.SZ"
+        
+        stock = yf.Ticker(ticker)
+        
+        # 尝试获取股票信息
+        try:
+            info = stock.info
+            stock_name = info.get('longName', '') or info.get('shortName', '')
+            
+            # 检查股票名称是否包含ST标记
+            if stock_name and ('ST' in stock_name.upper() or '*ST' in stock_name.upper()):
+                print(f"❌ {stock_code} 为ST股票: {stock_name}")
+                return True
+                
+        except Exception:
+            # 无法获取股票信息，可能已退市
+            pass
+        
+        # 检查是否能获取到近期交易数据
+        try:
+            hist = stock.history(period="5d")
+            if hist.empty:
+                print(f"❌ {stock_code} 无交易数据，可能已退市")
+                return True
+                
+            # 检查最近是否有交易量
+            recent_volume = hist['Volume'].tail(3).sum()
+            if recent_volume == 0:
+                print(f"❌ {stock_code} 近期无交易量，可能已停牌或退市")
+                return True
+                
+        except Exception:
+            print(f"❌ {stock_code} 数据获取异常，可能已退市")
+            return True
+            
+        return False
+        
+    except Exception as e:
+        print(f"❌ 检查{stock_code}异常: {e}")
+        return True  # 异常时默认过滤掉
+
 def generate_ai_analysis(news_text):
     """生成AI分析"""
     try:
@@ -212,6 +260,8 @@ def generate_ai_analysis(news_text):
 要求：
 - 只推荐A股（6位数字代码）
 - 优先推荐中小盘股票（市值≤500亿）
+- 严禁推荐ST股票、*ST股票或退市、科创版和北交所股票
+- 只推荐正常交易的主板、中小板、创业板股票
 - 提供具体操作建议
 - 1-5个交易日操作周期
                 """},
@@ -235,9 +285,20 @@ def update_stock_data_in_text(text):
     updated_text = text
     
     for code in stock_codes:
+        # 首先检查是否为ST股票或退市股票
+        if is_st_or_delisted_stock(code):
+            print(f"❌ {code} 为ST股票或已退市，已过滤")
+            # 从文本中移除这个股票代码的推荐
+            pattern = rf'- {code}[^\n]*\n?'
+            updated_text = re.sub(pattern, '', updated_text)
+            continue
+            
         # 检查市值是否符合要求
         if not check_market_cap(code):
             print(f"❌ {code} 市值超标，已过滤")
+            # 从文本中移除这个股票代码的推荐
+            pattern = rf'- {code}[^\n]*\n?'
+            updated_text = re.sub(pattern, '', updated_text)
             continue
             
         # 获取实时数据
