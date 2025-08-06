@@ -379,13 +379,13 @@ def update_stock_data_in_text(text):
             updated_text = re.sub(pattern, '', updated_text)
             continue
             
-        # 检查市值是否符合要求
-        if not check_market_cap(code):
-            print(f"❌ {code} 市值超标，已过滤")
-            # 从文本中移除这个股票代码的推荐
-            pattern = rf'- {code}[^\n]*\n?'
-            updated_text = re.sub(pattern, '', updated_text)
-            continue
+        # # 检查市值是否符合要求
+        # if not check_market_cap(code):
+        #     print(f"❌ {code} 市值超标，已过滤")
+        #     # 从文本中移除这个股票代码的推荐
+        #     pattern = rf'- {code}[^\n]*\n?'
+        #     updated_text = re.sub(pattern, '', updated_text)
+        #     continue
             
         # 获取实时数据
         data = get_real_time_stock_data(code)
