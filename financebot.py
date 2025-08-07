@@ -516,9 +516,9 @@ def send_email_notification(title, content, to_email="6052571@qq.com"):
     # 邮件配置 - 使用QQ邮箱SMTP服务
     smtp_server = "smtp.qq.com"
     smtp_port = 587
-    
     # 发件人邮箱和授权码（需要从环境变量获取）
     sender_email = os.getenv("EMAIL_SENDER")
+    print('sender_email=',sender_email)
     email_password = os.getenv("EMAIL_PASSWORD")
     
     if not sender_email or not email_password:
