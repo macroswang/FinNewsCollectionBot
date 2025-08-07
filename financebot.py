@@ -11,6 +11,10 @@ import re
 import yfinance as yf
 from openai import OpenAI
 
+sender_email = os.getenv("EMAIL_SENDER")
+print('sender_email=',sender_email)
+email_password = os.getenv("EMAIL_PASSWORD")
+
 # 环境变量配置
 openai_api_key = os.getenv("OPENAI_API_KEY")
 if not openai_api_key:
@@ -517,10 +521,6 @@ def send_email_notification(title, content, to_email="6052571@qq.com"):
     smtp_server = "smtp.qq.com"
     smtp_port = 587
     # 发件人邮箱和授权码（需要从环境变量获取）
-    sender_email = os.getenv("EMAIL_SENDER")
-    print('sender_email=',sender_email)
-    email_password = os.getenv("EMAIL_PASSWORD")
-    
     if not sender_email or not email_password:
         print("❌ 邮件配置缺失: 请设置 EMAIL_SENDER 和 EMAIL_PASSWORD 环境变量")
         return
