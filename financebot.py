@@ -506,6 +506,50 @@ def send_wechat_notification(title, content):
         except Exception as e:
             print(f"❌ 推送异常: {key}, {e}")
 
+def send_email_notification(title, content, to_email="6052571@qq.com"):
+    """发送邮件通知"""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    from email.header import Header
+    
+    # 邮件配置 - 使用QQ邮箱SMTP服务
+    smtp_server = "smtp.qq.com"
+    smtp_port = 587
+    
+    # 发件人邮箱和授权码（需要从环境变量获取）
+    sender_email = os.getenv("EMAIL_SENDER")
+    email_password = os.getenv("EMAIL_PASSWORD")
+    
+    if not sender_email or not email_password:
+        print("❌ 邮件配置缺失: 请设置 EMAIL_SENDER 和 EMAIL_PASSWORD 环境变量")
+        return
+    
+    try:
+        # 创建邮件对象
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = to_email
+        msg['Subject'] = Header(title, 'utf-8')
+        
+        # 邮件正文
+        text_part = MIMEText(content, 'plain', 'utf-8')
+        msg.attach(text_part)
+        
+        # 发送邮件
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(sender_email, email_password)
+        
+        text = msg.as_string()
+        server.sendmail(sender_email, to_email, text)
+        server.quit()
+        
+        print(f"✅ 邮件发送成功: {to_email}")
+        
+    except Exception as e:
+        print(f"❌ 邮件发送失败: {e}")
+
 def main():
     """主函数"""
     today_str = get_today_date().strftime("%Y-%m-%d")
@@ -557,8 +601,15 @@ def main():
             final_message += f"## {category}\n{content}\n\n"
     
     # 发送推送
-    print("📤 正在发送推送...")
-    send_wechat_notification(
+    # print("📤 正在发送推送...")
+    # send_wechat_notification(
+    #     title=f"🎯 {today_str} 短线交易分析", 
+    #     content=final_message
+    # )
+    
+    # 发送邮件
+    print("📧 正在发送邮件...")
+    send_email_notification(
         title=f"🎯 {today_str} 短线交易分析", 
         content=final_message
     )
