@@ -605,6 +605,7 @@ def send_email_notification(title, content, to_email="6052571@qq.com"):
     except Exception as e:
         print(f"❌ 邮件发送失败: {e}")
 
+
 if __name__ == "__main__":
     today_str = today_date().strftime("%Y-%m-%d")
 
@@ -629,10 +630,10 @@ if __name__ == "__main__":
     summary = summarize(analysis_text, global_events)
 
     # 生成市场情绪和时机分析部分
-    # sentiment_section = "## 📊 市场情绪概览\n"
-    # for key, value in sentiment_data.items():
-    #     sentiment_section += f"- **{key}**: {value}\n"
-    # sentiment_section += "\n"
+    sentiment_section = "## 📊 市场情绪概览\n"
+    for key, value in sentiment_data.items():
+        sentiment_section += f"- **{key}**: {value}\n"
+    sentiment_section += "\n"
     
     # 添加实时市场指数数据
     indices_section = "## 📈 实时市场指数\n"
@@ -641,10 +642,10 @@ if __name__ == "__main__":
     indices_section += "\n"
     
     # 添加市场时机分析
-    # timing_section = "## ⏰ 市场时机分析\n"
-    # for key, value in timing_analysis.items():
-    #     timing_section += f"- **{key}**: {value}\n"
-    # timing_section += "\n"
+    timing_section = "## ⏰ 市场时机分析\n"
+    for key, value in timing_analysis.items():
+        timing_section += f"- **{key}**: {value}\n"
+    timing_section += "\n"
     
     # 生成全球联动分析部分
     global_analysis = ""
@@ -765,10 +766,10 @@ if __name__ == "__main__":
         strategy_section += "- **动态调整**: 根据市场变化调整仓位\n"
         strategy_section += "- **长期思维**: 优质股票可长期持有\n\n"
 
-        # stock_recommendations += strategy_section
+        stock_recommendations += strategy_section
 
     # 生成仅展示标题和链接的最终消息
-    final_summary = f"📅 **{today_str} 财经新闻摘要**\n\n{indices_section}{global_analysis}✍️ **今日分析总结：**\n{summary}\n\n{stock_recommendations}---\n\n"
+    final_summary = f"📅 **{today_str} 财经新闻摘要**\n\n{sentiment_section}{indices_section}{timing_section}{global_analysis}✍️ **今日分析总结：**\n{summary}\n\n{stock_recommendations}---\n\n"
     for category, content in articles_data.items():
         if content.strip():
             final_summary += f"## {category}\n{content}\n\n"
