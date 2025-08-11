@@ -31,6 +31,8 @@ jobs:
         run: |
           echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> $GITHUB_ENV
           echo "SERVER_CHAN_KEYS=${{ secrets.SERVER_CHAN_KEYS }}" >> $GITHUB_ENV
+          echo "EMAIL_SENDER=${{ secrets.EMAIL_SENDER }}" >> $GITHUB_ENV
+          echo "EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }}" >> $GITHUB_ENV
 
       - name: 🚀 运行脚本
         run: python financebot.py
