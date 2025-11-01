@@ -674,17 +674,37 @@ class StockRecommendationUpdater:
     def update_summary_with_realtime_data(
         self, 
         summary: str, 
-        stocks: List[StockRecommendation]
+        stocks: List[StockRecommendation],
+        check_market_cap_func=None
     ) -> str:
         """
         在AI摘要中用实时数据更新股票信息
         :param summary: 原始摘要
         :param stocks: 股票推荐列表（已更新实时数据）
+        :param check_market_cap_func: 市值检查函数（可选，用于过滤大市值股票）
         :return: 更新后的摘要
         """
         updated_summary = summary
         
         for stock in stocks:
+            # 如果提供了市值检查函数，只更新通过市值检查的股票，并从摘要中移除大市值股票
+            if check_market_cap_func and not check_market_cap_func(stock.code):
+                print(f"⚠️ {stock.code} {stock.name} 市值不符合标准，从摘要中移除大市值股票推荐")
+                # 从摘要中移除该股票的所有内容
+                old_patterns = [
+                    f"**{stock.code} {stock.name}**",
+                    f"{stock.code} {stock.name}",
+                    f"**{stock.code}**",
+                ]
+                for old_pattern in old_patterns:
+                    if old_pattern in updated_summary:
+                        # 匹配从股票标题到下一个股票或章节结束的所有内容并删除
+                        pattern = rf"{re.escape(old_pattern)}.*?(?=\*\*\d{{6}}\s+\w+|\n##\s+|\n###\s+|\Z)"
+                        updated_summary = re.sub(pattern, "", updated_summary, flags=re.DOTALL)
+                        print(f"  ✅ 已从摘要中移除 {stock.code} {stock.name}（市值过大）")
+                        break
+                continue
+                
             if stock.real_time_data:
                 new_stock_block = self._generate_stock_block(stock)
                 
@@ -922,10 +942,11 @@ class StockRecommendationManager:
             updated_stocks = []
             print("⚠️ 没有提取到需要更新的股票")
         
-        # 3. 用实时数据更新摘要
+        # 3. 用实时数据更新摘要（只更新通过市值检查的股票）
         updated_summary = self.updater.update_summary_with_realtime_data(
             summary, 
-            updated_stocks
+            updated_stocks,
+            check_market_cap_func=self.extractor.check_market_cap
         )
         
         return updated_summary, extracted
