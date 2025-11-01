@@ -744,8 +744,8 @@ class StockRecommendationUpdater:
         return updated_summary
     
     def _generate_stock_block(self, stock: StockRecommendation) -> str:
-        """生成股票信息块（用于更新AI摘要）"""
-        block = f"**{stock.code} {stock.name}**\n\n"
+        """生成股票信息块（用于更新AI摘要）- 纯文本格式，无markdown"""
+        block = f"{stock.code} {stock.name}\n\n"
         
         # 实时价格（最优先显示，放在第一位）
         if stock.real_time_data and stock.real_time_data.get('current_price', 0) > 0:
@@ -755,24 +755,24 @@ class StockRecommendationUpdater:
             change_str = f"{change:+.2f}%" if isinstance(change, (int, float)) else "待获取"
             data_source = stock.real_time_data.get('data_source', '实时数据')
             source_emoji = "⚡" if "实时" in data_source else "📊"
-            block += f"💰 **当前股价**：{emoji} **¥{price:.2f}** ({change_str}) {source_emoji} {data_source}\n\n"
+            block += f"💰 当前股价：{emoji} ¥{price:.2f} ({change_str}) {source_emoji} {data_source}\n\n"
         else:
-            block += f"💰 **当前股价**：⚠️ 实时数据获取中...\n\n"
+            block += f"💰 当前股价：⚠️ 实时数据获取中...\n\n"
         
         # 推荐理由（包含市值）
         reason = stock.reason
         if stock.get_market_cap_str() and '市值' not in reason:
             reason += stock.get_market_cap_str()
-        block += f"- **推荐理由**：{reason}\n\n"
+        block += f"推荐理由：{reason}\n\n"
         
         # 其他信息
-        block += f"- **风险等级**：{stock.risk}\n\n"
-        block += f"- **短线潜力**：{stock.short_term_potential}\n\n"
-        block += f"- **建议持仓时间**：{stock.holding_period}\n\n"
+        block += f"风险等级：{stock.risk}\n\n"
+        block += f"短线潜力：{stock.short_term_potential}\n\n"
+        block += f"建议持仓时间：{stock.holding_period}\n\n"
         
         # 买入/卖出策略（已基于实时价格更新）
-        block += f"- **买入策略**：{stock.entry_strategy}\n\n"
-        block += f"- **卖出策略**：{stock.exit_strategy}\n\n"
+        block += f"买入策略：{stock.entry_strategy}\n\n"
+        block += f"卖出策略：{stock.exit_strategy}\n\n"
         
         # 技术面（基于实时数据）
         if stock.real_time_data:
@@ -786,19 +786,19 @@ class StockRecommendationUpdater:
             ma50_info = f"，50日均线{ma50:.2f}元" if ma50 else ""
             
             if support > 0 and resistance > 0:
-                block += f"- **技术面**：支撑位{support:.2f}元{ma20_info}{ma50_info}，阻力位{resistance:.2f}元\n\n"
+                block += f"技术面：支撑位{support:.2f}元{ma20_info}{ma50_info}，阻力位{resistance:.2f}元\n\n"
             elif current_price > 0:
-                block += f"- **技术面**：当前价{current_price:.2f}元{ma20_info}{ma50_info}，技术指标待计算\n\n"
+                block += f"技术面：当前价{current_price:.2f}元{ma20_info}{ma50_info}，技术指标待计算\n\n"
             else:
-                block += f"- **技术面**：{stock.support_resistance}\n\n"
+                block += f"技术面：{stock.support_resistance}\n\n"
         else:
-            block += f"- **技术面**：{stock.support_resistance}\n\n"
+            block += f"技术面：{stock.support_resistance}\n\n"
         
         # 成交量信息
         if stock.real_time_data and stock.real_time_data.get("volume_ratio"):
             volume_ratio = stock.real_time_data.get("volume_ratio", 1)
             volume_emoji = "🔥" if volume_ratio > 1.5 else "📊" if volume_ratio > 1 else "📉"
-            block += f"- **成交量**：{volume_emoji} 较20日均量 {volume_ratio:.1f}倍\n\n"
+            block += f"成交量：{volume_emoji} 较20日均量 {volume_ratio:.1f}倍\n\n"
         
         return block
 
