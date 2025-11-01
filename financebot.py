@@ -1544,16 +1544,66 @@ if __name__ == "__main__":
                 try:
                     real_time_data = get_real_time_stock_data(stock["code"])
                     if real_time_data:
-                        # 构建新的股票信息行
-                        new_stock_line = f"**{stock['code']} {stock['name']}**\n"
-                        new_stock_line += f"推荐理由：{stock['reason']}。\n"
-                        new_stock_line += f"风险等级：{stock['risk']}。\n"
-                        new_stock_line += f"短线潜力：{stock['short_term_potential']}。\n"
-                        new_stock_line += f"持仓时间：{stock['holding_period']}。\n"
-                        # 使用实时价格数据，如果技术指标不可用则使用当前价格
+                        # 获取市值信息（转换为亿元）
+                        market_cap_info = ""
+                        if real_time_data.get("market_cap") and real_time_data["market_cap"] != 'N/A':
+                            market_cap = real_time_data["market_cap"]
+                            if isinstance(market_cap, (int, float)):
+                                market_cap_billion = market_cap / 100000000  # 转换为亿元
+                                market_cap_info = f"，市值约{market_cap_billion:.0f}亿"
+                        
+                        # 构建新的股票信息行，格式与用户邮件中的格式保持一致
+                        new_stock_line = f"**{stock['code']} {stock['name']}**\n\n"
+                        
+                        # 推荐理由（包含市值信息）
+                        reason_with_market_cap = stock['reason']
+                        if market_cap_info and '市值' not in reason_with_market_cap:
+                            # 如果推荐理由中不包含市值，则添加
+                            reason_with_market_cap += market_cap_info
+                        new_stock_line += f"- **推荐理由**：{reason_with_market_cap}\n\n"
+                        
+                        # 其他信息
+                        new_stock_line += f"- **风险等级**：{stock['risk']}\n\n"
+                        new_stock_line += f"- **短线潜力**：{stock['short_term_potential']}\n\n"
+                        
+                        # 建议持仓时间
+                        holding_period = stock.get('holding_period', stock.get('建议持仓时间', '待确认'))
+                        new_stock_line += f"- **建议持仓时间**：{holding_period}\n\n"
+                        
+                        # 买入策略
+                        entry_strategy = stock.get('entry_strategy', stock.get('买入策略', '待确认'))
+                        new_stock_line += f"- **买入策略**：{entry_strategy}\n\n"
+                        
+                        # 卖出策略
+                        exit_strategy = stock.get('exit_strategy', stock.get('卖出策略', '待确认'))
+                        new_stock_line += f"- **卖出策略**：{exit_strategy}\n\n"
+                        
+                        # 技术面（使用实时价格数据，如果技术指标不可用则使用当前价格）
                         support_price = real_time_data.get('recent_low', real_time_data['current_price'])
                         resistance_price = real_time_data.get('recent_high', real_time_data['current_price'])
-                        new_stock_line += f"技术面：支撑位{support_price}元，阻力位{resistance_price}元（当前价{real_time_data['current_price']}元）。\n"
+                        ma20_info = ""
+                        if real_time_data.get('ma20'):
+                            ma20_info = f"（20日均线{real_time_data['ma20']:.2f}元）"
+                        new_stock_line += f"- **技术面**：支撑位{support_price:.2f}元{ma20_info}，阻力位{resistance_price:.2f}元（前高）\n\n"
+                        
+                        # 当前数据（最新价格、涨跌幅、成交量）
+                        current_price = real_time_data['current_price']
+                        price_change = real_time_data.get('price_change', 0)
+                        price_change_emoji = "📈" if price_change > 0 else "📉" if price_change < 0 else "➡️"
+                        price_change_str = f"{price_change:+.2f}%" if isinstance(price_change, (int, float)) else "待获取"
+                        
+                        # 成交量分析
+                        volume_info = ""
+                        if real_time_data.get("volume_ratio"):
+                            volume_ratio = real_time_data["volume_ratio"]
+                            if volume_ratio > 1.5:
+                                volume_info = "，成交量放大"
+                            elif volume_ratio > 1:
+                                volume_info = "，成交量略有增加"
+                            else:
+                                volume_info = "，成交量萎缩"
+                        
+                        new_stock_line += f"- **当前数据**：约{current_price:.2f}元{price_change_emoji}，近期涨幅{price_change_str}{volume_info}\n"
                         
                         # 在AI摘要中查找并替换对应的股票信息
                         old_pattern = f"**{stock['code']} {stock['name']}**"
@@ -1565,11 +1615,15 @@ if __name__ == "__main__":
                             pattern = rf"{re.escape(old_pattern)}.*?(?=\*\*\d{{6}}\s+\w+|\n##|\n###|\Z)"
                             replacement = new_stock_line.rstrip()
                             updated_summary = re.sub(pattern, replacement, updated_summary, flags=re.DOTALL)
-                            print(f"✅ 已更新 {stock['code']} {stock['name']} 的实时数据")
+                            print(f"✅ 已更新 {stock['code']} {stock['name']} 的实时数据（价格¥{current_price:.2f}，涨跌幅{price_change_str}）")
+                            if market_cap_info:
+                                print(f"   市值信息：{market_cap_info}")
                         else:
                             print(f"⚠️ 在AI摘要中未找到 {stock['code']} {stock['name']} 的原始信息")
                 except Exception as e:
                     print(f"⚠️ 更新 {stock['code']} 实时数据失败: {e}")
+                    import traceback
+                    traceback.print_exc()
         
         final_summary = f"📅 **{today_str} 散户短线交易专用分析**\n\n{retail_analysis}{sentiment_section}{indices_section}{timing_section}{global_analysis}✍️ **今日分析总结：**\n{updated_summary}\n\n---\n\n"
     else:
