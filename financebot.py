@@ -12,16 +12,32 @@ import re
 import yfinance as yf
 import pandas as pd
 
-# OpenAI API Key
+# 导入重构后的股票推荐模块
+from stock_recommendation import StockRecommendationManager
+
+# 导入增强的新闻源模块（可选，默认使用基础RSS源）
+try:
+    from enhanced_news_sources import EnhancedNewsSources
+    USE_ENHANCED_SOURCES = True
+except ImportError:
+    USE_ENHANCED_SOURCES = False
+    print("⚠️ 增强新闻源模块未找到，使用基础RSS源")
+
+# OpenAI API Key - 优先从环境变量获取，如果没有则尝试从本地配置获取
 openai_api_key = os.getenv("OPENAI_API_KEY")
 if not openai_api_key:
-    raise ValueError("环境变量 OPENAI_API_KEY 未设置，请在Github Actions中设置此变量！")
+    try:
+        from local_config import LOCAL_OPENAI_API_KEY
+        openai_api_key = LOCAL_OPENAI_API_KEY
+        print("✅ 从本地配置文件加载 OPENAI_API_KEY")
+    except ImportError:
+        print("⚠️ local_config.py 未找到，尝试使用环境变量")
+        # 如果都没有，使用默认值（仅用于本地快速测试）
+        openai_api_key = "sk-258c3c66c9044159b64c232a49d44c52"
+        print("⚠️ 使用本地默认 OPENAI_API_KEY")
 
-# 从环境变量获取 Server酱 SendKeys
-server_chan_keys_env = os.getenv("SERVER_CHAN_KEYS")
-if not server_chan_keys_env:
-    raise ValueError("环境变量 SERVER_CHAN_KEYS 未设置，请在Github Actions中设置此变量！")
-server_chan_keys = server_chan_keys_env.split(",")
+if not openai_api_key:
+    raise ValueError("OPENAI_API_KEY 未设置！请设置环境变量或创建 local_config.py 文件")
 
 openai_client = OpenAI(api_key=openai_api_key, base_url="https://api.deepseek.com/v1")
 
@@ -153,98 +169,134 @@ def summarize(text, global_events=None):
             model="deepseek-chat",
             messages=[
                 {"role": "system", "content": """
-                 你是一名专业的短线交易分析师，专门为散户投资者提供短线交易建议。请根据以下新闻内容，按照以下步骤进行分析：
+你是一名专业的短线交易分析师，为散户投资者提供基于最新新闻的短线交易建议。
 
-                 **短线交易分析框架：**
-                 
-                 1. **热点识别与预见性分析**：
-                    - 识别未来1-3天可能爆发的热点板块
-                    - 分析哪些行业/概念有短期催化剂（政策、事件、数据发布等）
-                    - 找出资金流向和情绪变化信号
-                 
-                 2. **短线机会挖掘**：
-                    - 找出近期涨幅较小但基本面改善的板块
-                    - 识别超跌反弹机会
-                    - 分析板块轮动规律，预判下一个轮动方向
-                 
-                 3. **风险控制建议**：
-                    - 识别短期风险事件和利空因素
-                    - 分析市场情绪拐点
-                    - 提供仓位控制建议
-                 
-                 4. **短线交易策略**：
-                    - 建议买入时机和价格区间
-                    - 设置合理的止盈止损位
-                    - 提供持仓时间建议（1-5个交易日）
-                    - 分析快进快出的最佳时机
-                 
-                 5. **资金管理**：
-                    - 建议单笔投资金额比例
-                    - 提供分散投资建议
-                    - 分析资金使用效率
-                 
-                 **输出格式要求：**
-                 
-                 ## 🎯 短线交易机会
-                 
-                 ### 📈 热点板块（1-3天爆发预期）
-                 - 板块名称：具体推荐理由
-                 - 催化剂：触发因素和时间
-                 - 目标涨幅：预期收益
-                 - 风险提示：需要注意的风险
-                 
-                 ### 🔄 轮动机会（超跌反弹）
-                 - 板块名称：反弹逻辑
-                 - 技术面：支撑位和阻力位
-                 - 买入时机：具体建议
-                 - 止盈止损：价格区间
-                 
-                 ## 🎯 具体股票推荐（仅限A股）
-                 
-                 ### 📈 热点板块股票（A股）
-                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略，技术面支撑位/阻力位
-                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略，技术面支撑位/阻力位
-                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略，技术面支撑位/阻力位
-                 
-                 ### 🔄 轮动机会股票（A股）
-                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略，技术面支撑位/阻力位
-                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略，技术面支撑位/阻力位
-                 - 股票代码 股票名称: 推荐理由，风险等级，短线潜力，建议持仓时间，买入策略，卖出策略，技术面支撑位/阻力位
-                 
-                 ## ⚠️ 风险提示
-                 - 短期利空因素
-                 - 需要规避的板块
-                 - 市场情绪变化信号
-                 
-                 ## 💰 资金配置建议
-                 - 总仓位建议
-                 - 单笔投资比例
-                 - 分散投资策略
-                 
-                 ## 📊 操作策略
-                 - 买入时机：具体时间窗口
-                 - 卖出策略：分批止盈建议
-                 - 风险控制：止损执行要点
-                 
-                 注意：
-                 - 重点关注1-5个交易日的短线机会
-                 - 提供具体的价格区间和操作建议
-                 - 强调风险控制和资金管理
-                 - 避免过度乐观，保持理性分析
-                 - 重点关注板块轮动和热点切换
-                 - 分析资金流向和情绪变化
-                 - 提供具体的操作建议和风险控制
-                 - 推荐股票要结合新闻热点，优先选择中小盘股票（市值≤500亿）
-                 - 避免推荐超大市值股票（如茅台、宁德时代等）
-                 - **重要：只推荐A股股票，不要推荐港股、美股或其他海外股票**
-                 - 股票代码格式：6位数字（如000001、600000、300001等）
-                 - **关键要求：具体股票推荐必须从热点板块和轮动机会中通过AI分析总结后产生，确保推荐的股票与新闻热点和板块轮动逻辑直接相关**
-                 - **技术面分析要求：为每只推荐的股票提供技术面支撑位/阻力位分析，包括近期低点、高点、关键均线位置等**
-                 - **股价信息要求：提供包括当前价格、涨跌幅、成交量等关键数据**
-                 - **市值限制要求：严格只推荐市值在500亿以下的中小盘股票，绝对不要推荐市值超过500亿的大盘股**
-                 - **禁止推荐股票：茅台、宁德时代、比亚迪、中国平安、招商银行等市值超过1000亿的超大盘股**
-                 """},
-                {"role": "user", "content": f"新闻内容：{text}\n\n{global_context}"}
+**🔴 核心约束（必须严格遵守）：**
+1. **严格基于新闻**：所有推荐必须基于提供的新闻内容，严禁使用训练数据中的历史信息、预设股票或通用知识
+2. **新闻驱动推荐**：只有新闻中明确提到或直接相关的股票才能推荐
+3. **明确引用来源**：推荐理由必须明确说明与新闻的关联（格式："新闻中提到XX政策/事件..."）
+4. **禁止预设股票**：严禁推荐新闻中未提及的知名股票（如茅台、宁德时代等），除非新闻明确涉及
+5. **市值限制**：只推荐市值≤500亿的中小盘股票（除非新闻明确涉及大盘股）
+
+**📋 分析流程（按顺序执行）：**
+
+步骤1：提取新闻关键信息
+- 从新闻中提取：政策名称、公司名称、行业名称、事件时间、影响范围
+- 优先级：最新事件 > 政策公告 > 业绩公告 > 行业动态
+
+步骤2：识别热点板块（1-3天爆发预期）
+- 找出新闻中提到的短期催化剂（政策、事件、数据发布）
+- 分析新闻反映的资金流向和情绪变化
+- 识别未来1-3天可能爆发的热点板块
+
+步骤3：挖掘轮动机会（超跌反弹）
+- 识别新闻中提到的超跌板块
+- 分析新闻反映的板块轮动信号
+
+步骤4：匹配具体股票（仅限A股）
+- 优先：新闻中明确提到的股票（股票代码或公司全称）
+- 次优：新闻中明确提到的行业的直接相关股票
+- 禁止：新闻中未提及的股票，即使属于相关行业
+
+步骤5：风险识别
+- 从新闻中提取利空因素和风险事件
+- 识别市场情绪变化信号
+
+**📝 输出格式（严格按照此格式）：**
+
+## 🎯 短线交易机会
+
+### 📈 热点板块（1-3天爆发预期）
+**板块名称**：基于新闻的具体推荐理由（必须引用新闻内容，如"新闻中提到XX政策将于X月X日发布"）
+
+**催化剂**：新闻中提到的触发因素和时间（精确到天）
+
+**目标涨幅**：基于新闻事件的合理预期（使用范围，如"5-10%"）
+
+**风险提示**：新闻中需要注意的风险
+
+### 🔄 轮动机会（超跌反弹）
+**板块名称**：新闻中提到的反弹逻辑（引用新闻）
+
+**技术面**：支撑位和阻力位（基于新闻中的价格信息）
+
+**买入时机**：具体建议（结合新闻时效性）
+
+**止盈止损**：价格区间
+
+## 🎯 具体股票推荐（仅限A股）
+
+**格式要求**：每只股票单独一行，格式如下：
+```
+**股票代码 股票名称**
+
+- **推荐理由**：必须明确说明与新闻内容的关联（如"新闻中提到XX政策将于X月X日发布，该股作为XX细分领域龙头直接受益"）
+
+- **风险等级**：低/中/高
+
+- **短线潜力**：合理范围（如"5-10%"），基于新闻事件影响程度
+
+- **建议持仓时间**：X-X个交易日（结合新闻时效性）
+
+- **买入策略**：具体建议（如"回调至XX元附近分批买入"或"突破XX元时追入"）
+
+- **卖出策略**：分批止盈建议（如"XX元附近分批止盈"）
+
+- **技术面**：支撑位XX元，阻力位XX元（如果新闻中提到价格信息则使用，否则标注"待获取"）
+```
+
+### 📈 热点板块股票（A股）
+（按照上述格式输出，最多3只）
+
+### 🔄 轮动机会股票（A股）
+（按照上述格式输出，最多3只）
+
+**如果没有合适的股票**：输出"当前新闻中未发现符合条件的股票推荐，建议关注板块机会。"
+
+## ⚠️ 风险提示
+- 新闻中提到的短期利空因素
+- 需要规避的板块（基于新闻）
+- 新闻反映的市场情绪变化信号
+
+## 💰 资金配置建议
+- 总仓位建议：基于新闻风险程度
+- 单笔投资比例：X-X%
+- 分散投资策略
+
+## 📊 操作策略
+- **买入时机**：结合新闻事件的时效性（如"X月X日政策发布前"）
+- **卖出策略**：分批止盈建议
+- **风险控制**：止损执行要点
+
+**✅ 输出前自我检查清单：**
+- [ ] 所有推荐理由都明确引用了新闻（包含"新闻中提到"、"根据新闻"等关键词）
+- [ ] 所有股票代码都是6位数字格式（000001、600000、300001等）
+- [ ] 没有推荐新闻中未提及的股票
+- [ ] 市值限制已遵守（≤500亿，除非新闻明确涉及大盘股）
+- [ ] 如果没有合适的股票，已明确说明"未发现符合条件的股票"
+
+**推荐理由格式示例：**
+
+✅ **正确示例**：
+- "新闻中提到国家发改委将于明日发布新能源补贴政策，该股作为光伏逆变器细分领域龙头，直接受益于政策利好"
+- "根据新闻中报道，XX公司昨日发布业绩预告超预期，该股属于同行业，存在轮动上涨机会"
+- "新闻中提到X月X日将召开XX行业峰会，该股在该行业具有技术优势，预期受益"
+
+❌ **错误示例**（会被系统过滤）：
+- "光伏逆变器龙头，直接受益于风光装机目标"（未明确引用新闻）
+- "该公司基本面良好，业绩稳定增长"（使用训练数据）
+- "该行业长期看好，投资价值高"（使用通用知识）
+"""},
+                {"role": "user", "content": f"""
+当前日期：{today_date().strftime('%Y年%m月%d日')}
+
+新闻内容：
+{text}
+
+{global_context}
+
+请严格按照系统提示进行分析，确保所有推荐都基于上述新闻内容。
+"""}
             ]
         )
         return completion.choices[0].message.content.strip()
@@ -288,7 +340,7 @@ def analyze_market_timing():
         "消息面": "📰 政策利好频出",
         "资金面": "💰 流动性充裕"
     }
-    return {}
+    return timing_analysis
 
 # 获取主要指数实时数据
 def get_market_indices():
@@ -1218,19 +1270,9 @@ def extract_industries_from_news(text):
     
     return list(set(all_industries)), global_events  # 去重并返回全球事件
 
-# 发送微信推送
-def send_to_wechat(title, content):
-    for key in server_chan_keys:
-        url = f"https://sctapi.ftqq.com/{key}.send"
-        data = {"title": title, "desp": content}
-        response = requests.post(url, data=data, timeout=10)
-        if response.ok:
-            print(f"✅ 推送成功: {key}")
-        else:
-            print(f"❌ 推送失败: {key}, 响应：{response.text}")
 
 def send_email_notification(title, content, to_email="6052571@qq.com"):
-    """发送邮件通知"""
+    """发送邮件通知（可选功能）"""
     import smtplib
     from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
@@ -1243,7 +1285,8 @@ def send_email_notification(title, content, to_email="6052571@qq.com"):
     email_password = os.getenv("EMAIL_PASSWORD")
     # 发件人邮箱和授权码（需要从环境变量获取）
     if not sender_email or not email_password:
-        print("❌ 邮件配置缺失: 请设置 EMAIL_SENDER 和 EMAIL_PASSWORD 环境变量")
+        print("⚠️ 邮件配置缺失: EMAIL_SENDER 和 EMAIL_PASSWORD 未设置，将跳过邮件发送（本地运行模式）")
+        print(f"📄 分析结果已生成，内容长度: {len(content)} 字符")
         return
     
     try:
@@ -1277,8 +1320,15 @@ if __name__ == "__main__":
     
     today_str = today_date().strftime("%Y-%m-%d")
 
-    # 每个网站获取最多 5 篇文章
-    articles_data, analysis_text = fetch_rss_articles(rss_feeds, max_articles=5)
+    # 获取新闻内容（优先使用增强源，如果可用）
+    if USE_ENHANCED_SOURCES:
+        print("🚀 使用增强新闻源获取资讯...")
+        enhanced_sources = EnhancedNewsSources()
+        articles_data, analysis_text = enhanced_sources.get_all_news(max_articles_per_source=5)
+        print(f"✅ 增强源获取完成，分析文本长度: {len(analysis_text)} 字符")
+    else:
+        print("📡 使用基础RSS源获取资讯...")
+        articles_data, analysis_text = fetch_rss_articles(rss_feeds, max_articles=5)
     
     # 获取市场情绪数据和时机分析
     sentiment_data = get_market_sentiment()
@@ -1300,11 +1350,23 @@ if __name__ == "__main__":
     print(f"📝 摘要是否包含'具体股票推荐': {'具体股票推荐' in summary}")
     print(f"📝 摘要是否包含'A股': {'A股' in summary}")
     
-    # 从AI摘要中提取股票推荐信息
-    extracted_stocks = extract_stock_recommendations_from_summary(summary)
-    print(f"🔍 提取到的股票推荐: {extracted_stocks}")
+    # 使用重构后的股票推荐管理器
+    # 传入原始新闻内容，用于验证推荐的股票是否基于真实新闻
+    stock_manager = StockRecommendationManager(
+        get_realtime_data_func=get_real_time_stock_data,
+        check_market_cap_func=check_stock_market_cap,
+        get_stock_industry_func=get_stock_industry,
+        news_content=analysis_text  # 传入原始新闻内容用于验证
+    )
+    
+    # 处理AI摘要，提取并更新股票推荐
+    updated_summary, extracted_stocks = stock_manager.process_summary(summary)
+    summary = updated_summary  # 使用更新后的摘要
+    
+    print(f"🔍 提取到的股票推荐:")
     print(f"📊 热点板块股票数量: {len(extracted_stocks.get('hot_sector_stocks', []))}")
     print(f"🔄 轮动机会股票数量: {len(extracted_stocks.get('rotation_stocks', []))}")
+    print(f"📋 所有股票数量: {len(extracted_stocks.get('all_stocks_in_summary', []))}")
 
     # 生成市场情绪和时机分析部分
     sentiment_section = "## 📊 市场情绪概览\n"
@@ -1315,8 +1377,8 @@ if __name__ == "__main__":
     # 添加实时市场指数数据
     indices_section = "## 📈 实时市场指数\n"
     for key, value in market_indices.items():
-        sentiment_section += f"- **{key}**: {value}\n"
-    sentiment_section += "\n"
+        indices_section += f"- **{key}**: {value}\n"
+    indices_section += "\n"
     
     # 添加市场时机分析
     timing_section = "## ⏰ 市场时机分析\n"
@@ -1336,299 +1398,27 @@ if __name__ == "__main__":
         global_analysis += "💡 **联动提示**: 全球事件通过资金流向、情绪传导、供应链影响等方式影响A股市场\n\n"
 
     # 生成股票推荐部分（仅用于AI摘要中没有股票推荐的情况）
-    stock_recommendations = ""
-    
-    # 使用从AI摘要中提取的股票推荐
-    print(f"🔍 检查股票推荐条件: hot_sector_stocks={bool(extracted_stocks['hot_sector_stocks'])}, rotation_stocks={bool(extracted_stocks['rotation_stocks'])}")
-    
-    # 注意：这里的股票推荐生成逻辑只在AI摘要中没有股票推荐时使用
-    # 如果AI摘要中已有股票推荐，实时数据更新会在后面的逻辑中处理
-    if extracted_stocks["hot_sector_stocks"] or extracted_stocks["rotation_stocks"]:
-        stock_recommendations = "## 🎯 具体股票推荐（仅限A股）\n\n"
-        
-        # 显示热点板块股票
-        if extracted_stocks["hot_sector_stocks"]:
-            stock_recommendations += "### 📈 热点板块股票（A股）\n"
-            for stock in extracted_stocks["hot_sector_stocks"][:3]:  # 最多显示3只
-                # 验证股票行业分类（如果可能）
-                try:
-                    stock_industry = get_stock_industry(stock["code"])
-                    print(f"✅ {stock['code']} {stock['name']} 属于{stock_industry}行业")
-                except:
-                    print(f"⚠️ 无法验证{stock['code']} {stock['name']}的行业分类")
-                
-                # 获取实时数据
-                real_time_data = None
-                try:
-                    print(f"📊 正在获取{stock['code']}的实时数据...")
-                    real_time_data = get_real_time_stock_data(stock['code'])
-                except Exception as e:
-                    print(f"⚠️ 获取{stock['code']}实时数据失败: {e}")
-                
-                # 按照用户要求的格式显示股票推荐
-                stock_recommendations += f"**{stock['code']} {stock['name']}**\n"
-                stock_recommendations += f"推荐理由：{stock['reason']}。\n"
-                stock_recommendations += f"风险等级：{stock['risk']}。\n"
-                stock_recommendations += f"短线潜力：{stock['short_term_potential']}。\n"
-                stock_recommendations += f"建议持仓时间：{stock['holding_period']}。\n"
-                stock_recommendations += f"买入策略：{stock['entry_strategy']}。\n"
-                stock_recommendations += f"卖出策略：{stock['exit_strategy']}\n"
-                
-                # 显示最新价格数据
-                if real_time_data:
-                    price_change_emoji = "📈" if real_time_data["price_change"] > 0 else "📉" if real_time_data["price_change"] < 0 else "➡️"
-                    data_source_emoji = "⚡" if "实时" in real_time_data.get("data_source", "") else "📊"
-                    stock_recommendations += f"**最新价格：¥{real_time_data['current_price']} {price_change_emoji} {real_time_data['price_change']}% {data_source_emoji} {real_time_data.get('data_source', '未知')}**\n"
-                    
-                    # 显示技术面数据
-                    if real_time_data.get("ma20") and real_time_data.get("ma50"):
-                        trend = "上涨" if real_time_data["current_price"] > real_time_data["ma20"] else "下跌" if real_time_data["current_price"] < real_time_data["ma20"] else "震荡"
-                        stock_recommendations += f"技术面：{trend} | MA20:¥{real_time_data['ma20']:.2f} | MA50:¥{real_time_data['ma50']:.2f}\n"
-                    
-                    # 显示支撑阻力位（优先使用实时数据）
-                    if real_time_data.get("recent_low") and real_time_data.get("recent_high"):
-                        stock_recommendations += f"支撑/阻力：¥{real_time_data['recent_low']:.2f} / ¥{real_time_data['recent_high']:.2f}\n"
-                    # 如果实时数据没有支撑阻力位，则使用AI摘要中的信息
-                    elif stock.get('support_resistance') and stock['support_resistance'] != "待获取":
-                        stock_recommendations += f"技术面支撑/阻力：{stock['support_resistance']}\n"
-                    
-                    # 显示成交量分析
-                    if real_time_data.get("volume_ratio"):
-                        volume_emoji = "🔥" if real_time_data["volume_ratio"] > 1.5 else "📊" if real_time_data["volume_ratio"] > 1 else "📉"
-                        stock_recommendations += f"成交量：{volume_emoji} {real_time_data['volume_ratio']:.1f}倍\n"
-                    
-                    # 显示估值数据
-                    if real_time_data.get("pe_ratio") and real_time_data["pe_ratio"] != 'N/A':
-                        pe_str = f"{real_time_data['pe_ratio']:.1f}" if isinstance(real_time_data['pe_ratio'], (int, float)) else str(real_time_data['pe_ratio'])
-                        pb_str = f"{real_time_data['pb_ratio']:.2f}" if real_time_data.get("pb_ratio") and real_time_data["pb_ratio"] != 'N/A' and isinstance(real_time_data['pb_ratio'], (int, float)) else 'N/A'
-                        stock_recommendations += f"估值：PE{pe_str} | PB{pb_str}\n"
-                    
-                    # 显示更新时间
-                    if real_time_data.get("update_time"):
-                        stock_recommendations += f"更新时间：{real_time_data['update_time']}\n"
-                else:
-                    stock_recommendations += f"**最新价格：数据获取中...**\n"
-                
-                stock_recommendations += "\n"
-        
-        # 显示轮动机会股票
-        if extracted_stocks["rotation_stocks"]:
-            stock_recommendations += "### 🔄 轮动机会股票（A股）\n"
-            for stock in extracted_stocks["rotation_stocks"][:3]:  # 最多显示3只
-                # 验证股票行业分类（如果可能）
-                try:
-                    stock_industry = get_stock_industry(stock["code"])
-                    print(f"✅ {stock['code']} {stock['name']} 属于{stock_industry}行业")
-                except:
-                    print(f"⚠️ 无法验证{stock['code']} {stock['name']}的行业分类")
-                
-                # 获取实时数据
-                real_time_data = None
-                try:
-                    print(f"📊 正在获取{stock['code']}的实时数据...")
-                    real_time_data = get_real_time_stock_data(stock['code'])
-                except Exception as e:
-                    print(f"⚠️ 获取{stock['code']}实时数据失败: {e}")
-                
-                # 按照用户要求的格式显示股票推荐
-                stock_recommendations += f"**{stock['code']} {stock['name']}**\n"
-                stock_recommendations += f"推荐理由：{stock['reason']}。\n"
-                stock_recommendations += f"风险等级：{stock['risk']}。\n"
-                stock_recommendations += f"短线潜力：{stock['short_term_potential']}。\n"
-                stock_recommendations += f"建议持仓时间：{stock['holding_period']}。\n"
-                stock_recommendations += f"买入策略：{stock['entry_strategy']}。\n"
-                stock_recommendations += f"卖出策略：{stock['exit_strategy']}\n"
-                
-                # 显示最新价格数据
-                if real_time_data:
-                    price_change_emoji = "📈" if real_time_data["price_change"] > 0 else "📉" if real_time_data["price_change"] < 0 else "➡️"
-                    data_source_emoji = "⚡" if "实时" in real_time_data.get("data_source", "") else "📊"
-                    stock_recommendations += f"**最新价格：¥{real_time_data['current_price']} {price_change_emoji} {real_time_data['price_change']}% {data_source_emoji} {real_time_data.get('data_source', '未知')}**\n"
-                    
-                    # 显示技术面数据
-                    if real_time_data.get("ma20") and real_time_data.get("ma50"):
-                        trend = "上涨" if real_time_data["current_price"] > real_time_data["ma20"] else "下跌" if real_time_data["current_price"] < real_time_data["ma20"] else "震荡"
-                        stock_recommendations += f"技术面：{trend} | MA20:¥{real_time_data['ma20']:.2f} | MA50:¥{real_time_data['ma50']:.2f}\n"
-                    
-                    # 显示支撑阻力位（优先使用实时数据）
-                    if real_time_data.get("recent_low") and real_time_data.get("recent_high"):
-                        stock_recommendations += f"支撑/阻力：¥{real_time_data['recent_low']:.2f} / ¥{real_time_data['recent_high']:.2f}\n"
-                    # 如果实时数据没有支撑阻力位，则使用AI摘要中的信息
-                    elif stock.get('support_resistance') and stock['support_resistance'] != "待获取":
-                        stock_recommendations += f"技术面支撑/阻力：{stock['support_resistance']}\n"
-                    
-                    # 显示成交量分析
-                    if real_time_data.get("volume_ratio"):
-                        volume_emoji = "🔥" if real_time_data["volume_ratio"] > 1.5 else "📊" if real_time_data["volume_ratio"] > 1 else "📉"
-                        stock_recommendations += f"成交量：{volume_emoji} {real_time_data['volume_ratio']:.1f}倍\n"
-                    
-                    # 显示估值数据
-                    if real_time_data.get("pe_ratio") and real_time_data["pe_ratio"] != 'N/A':
-                        pe_str = f"{real_time_data['pe_ratio']:.1f}" if isinstance(real_time_data['pe_ratio'], (int, float)) else str(real_time_data['pe_ratio'])
-                        pb_str = f"{real_time_data['pb_ratio']:.2f}" if real_time_data.get("pb_ratio") and real_time_data["pb_ratio"] != 'N/A' and isinstance(real_time_data['pb_ratio'], (int, float)) else 'N/A'
-                        stock_recommendations += f"估值：PE{pe_str} | PB{pb_str}\n"
-                    
-                    # 显示更新时间
-                    if real_time_data.get("update_time"):
-                        stock_recommendations += f"更新时间：{real_time_data['update_time']}\n"
-                else:
-                    stock_recommendations += f"**最新价格：数据获取中...**\n"
-                
-                stock_recommendations += "\n"
-        
-        # 如果没有提取到股票，不显示股票推荐部分
-        if not extracted_stocks["hot_sector_stocks"] and not extracted_stocks["rotation_stocks"]:
-            print("⚠️ 未从AI摘要中提取到股票推荐，跳过股票推荐部分")
-            stock_recommendations = ""
-        if stock_recommendations:
-            stock_recommendations += "⚠️ **投资提醒**: 以上推荐基于今日新闻动态生成，仅供参考，投资有风险，入市需谨慎！\n\n"
-        
-        # 添加短线交易策略建议（仅在有股票推荐时显示）
-        if stock_recommendations:
-            strategy_section = "## 💡 散户短线交易策略\n\n"
-            strategy_section += "### 📈 建仓策略\n"
-            strategy_section += "- **分批建仓**: 建议分2-3次建仓，降低单次风险\n"
-            strategy_section += "- **仓位控制**: 单只股票不超过总仓位的5-8%（资金量有限）\n"
-            strategy_section += "- **时机把握**: 关注回调机会，避免追高\n"
-            strategy_section += "- **快进快出**: 1-5个交易日完成交易\n\n"
-            
-            strategy_section += "### 🛡️ 风险控制\n"
-            strategy_section += "- **止损设置**: 严格执行止损，不超过-3%\n"
-            strategy_section += "- **止盈策略**: 分批止盈，目标≤10%\n"
-            strategy_section += "- **分散投资**: 避免过度集中在单一行业\n"
-            strategy_section += "- **资金管理**: 预留30%资金应对机会\n\n"
-            
-            strategy_section += "### 📊 短线操作要点\n"
-            strategy_section += "- **每日检视**: 每个交易日评估持仓表现\n"
-            strategy_section += "- **及时止盈**: 达到目标及时卖出，不贪心\n"
-            strategy_section += "- **严格止损**: 触及止损位立即卖出\n"
-            strategy_section += "- **关注量能**: 成交量是短线交易的重要指标\n\n"
-            stock_recommendations += strategy_section
-
-    # 生成散户短线交易专用分析
-    retail_analysis = {}
-    
-    # 保留AI摘要的完整内容，不再移除具体股票推荐部分
-    cleaned_summary = summary
-    
-    # 生成最终消息，避免重复的股票推荐
     # 检查AI摘要中是否已经包含股票推荐部分
     has_stock_recommendations_in_summary = (
-        "## 🎯 具体股票推荐" in cleaned_summary or 
-        "### 📈 热点板块股票" in cleaned_summary or 
-        "### 🔄 轮动机会股票" in cleaned_summary or
-        # 检查是否包含6位数字股票代码格式
-        bool(re.search(r'\b\d{6}\b', cleaned_summary))
+        "## 🎯 具体股票推荐" in summary or 
+        "### 📈 热点板块股票" in summary or 
+        "### 🔄 轮动机会股票" in summary or
+        bool(re.search(r'\b\d{6}\b', summary))
     )
     
     print(f"🔍 AI摘要中是否包含股票推荐: {has_stock_recommendations_in_summary}")
-    print(f"🔍 AI摘要中是否包含'具体股票推荐': {'具体股票推荐' in cleaned_summary}")
-    print(f"🔍 AI摘要中是否包含'热点板块股票': {'热点板块股票' in cleaned_summary}")
-    print(f"🔍 AI摘要中是否包含'轮动机会股票': {'轮动机会股票' in cleaned_summary}")
-    has_6digit_codes = bool(re.search(r'\b\d{6}\b', cleaned_summary))
-    print(f"🔍 AI摘要中是否包含6位数字股票代码: {has_6digit_codes}")
     
-    if has_stock_recommendations_in_summary:
-        # AI摘要中已包含股票推荐，但需要用实时数据更新股票信息
-        # 从AI摘要中提取股票推荐，然后用实时数据更新
-        updated_summary = cleaned_summary
-        
-        # 如果提取到了股票推荐，用实时数据更新AI摘要中的股票信息
-        if extracted_stocks["all_stocks_in_summary"]:
-            print("🔄 检测到AI摘要中包含股票推荐，正在用实时数据更新...")
-            print(f"🔍 AI摘要中共发现 {len(extracted_stocks['all_stocks_in_summary'])} 只股票需要更新")
-            
-            # 更新AI摘要中的所有股票（包括被市值过滤的股票）
-            for stock in extracted_stocks["all_stocks_in_summary"]:
-                print(f"🔍 正在处理股票: {stock['code']} {stock['name']}")
-                try:
-                    real_time_data = get_real_time_stock_data(stock["code"])
-                    if real_time_data:
-                        # 获取市值信息（转换为亿元）
-                        market_cap_info = ""
-                        if real_time_data.get("market_cap") and real_time_data["market_cap"] != 'N/A':
-                            market_cap = real_time_data["market_cap"]
-                            if isinstance(market_cap, (int, float)):
-                                market_cap_billion = market_cap / 100000000  # 转换为亿元
-                                market_cap_info = f"，市值约{market_cap_billion:.0f}亿"
-                        
-                        # 构建新的股票信息行，格式与用户邮件中的格式保持一致
-                        new_stock_line = f"**{stock['code']} {stock['name']}**\n\n"
-                        
-                        # 推荐理由（包含市值信息）
-                        reason_with_market_cap = stock['reason']
-                        if market_cap_info and '市值' not in reason_with_market_cap:
-                            # 如果推荐理由中不包含市值，则添加
-                            reason_with_market_cap += market_cap_info
-                        new_stock_line += f"- **推荐理由**：{reason_with_market_cap}\n\n"
-                        
-                        # 其他信息
-                        new_stock_line += f"- **风险等级**：{stock['risk']}\n\n"
-                        new_stock_line += f"- **短线潜力**：{stock['short_term_potential']}\n\n"
-                        
-                        # 建议持仓时间
-                        holding_period = stock.get('holding_period', stock.get('建议持仓时间', '待确认'))
-                        new_stock_line += f"- **建议持仓时间**：{holding_period}\n\n"
-                        
-                        # 买入策略
-                        entry_strategy = stock.get('entry_strategy', stock.get('买入策略', '待确认'))
-                        new_stock_line += f"- **买入策略**：{entry_strategy}\n\n"
-                        
-                        # 卖出策略
-                        exit_strategy = stock.get('exit_strategy', stock.get('卖出策略', '待确认'))
-                        new_stock_line += f"- **卖出策略**：{exit_strategy}\n\n"
-                        
-                        # 技术面（使用实时价格数据，如果技术指标不可用则使用当前价格）
-                        support_price = real_time_data.get('recent_low', real_time_data['current_price'])
-                        resistance_price = real_time_data.get('recent_high', real_time_data['current_price'])
-                        ma20_info = ""
-                        if real_time_data.get('ma20'):
-                            ma20_info = f"（20日均线{real_time_data['ma20']:.2f}元）"
-                        new_stock_line += f"- **技术面**：支撑位{support_price:.2f}元{ma20_info}，阻力位{resistance_price:.2f}元（前高）\n\n"
-                        
-                        # 当前数据（最新价格、涨跌幅、成交量）
-                        current_price = real_time_data['current_price']
-                        price_change = real_time_data.get('price_change', 0)
-                        price_change_emoji = "📈" if price_change > 0 else "📉" if price_change < 0 else "➡️"
-                        price_change_str = f"{price_change:+.2f}%" if isinstance(price_change, (int, float)) else "待获取"
-                        
-                        # 成交量分析
-                        volume_info = ""
-                        if real_time_data.get("volume_ratio"):
-                            volume_ratio = real_time_data["volume_ratio"]
-                            if volume_ratio > 1.5:
-                                volume_info = "，成交量放大"
-                            elif volume_ratio > 1:
-                                volume_info = "，成交量略有增加"
-                            else:
-                                volume_info = "，成交量萎缩"
-                        
-                        new_stock_line += f"- **当前数据**：约{current_price:.2f}元{price_change_emoji}，近期涨幅{price_change_str}{volume_info}\n"
-                        
-                        # 在AI摘要中查找并替换对应的股票信息
-                        old_pattern = f"**{stock['code']} {stock['name']}**"
-                        if old_pattern in updated_summary:
-                            # 找到旧信息并替换
-                            import re
-                            # 匹配从股票代码开始到下一个股票或段落结束的内容
-                            # 更精确的匹配模式：从股票代码开始到下一个股票代码或章节标题结束
-                            pattern = rf"{re.escape(old_pattern)}.*?(?=\*\*\d{{6}}\s+\w+|\n##|\n###|\Z)"
-                            replacement = new_stock_line.rstrip()
-                            updated_summary = re.sub(pattern, replacement, updated_summary, flags=re.DOTALL)
-                            print(f"✅ 已更新 {stock['code']} {stock['name']} 的实时数据（价格¥{current_price:.2f}，涨跌幅{price_change_str}）")
-                            if market_cap_info:
-                                print(f"   市值信息：{market_cap_info}")
-                        else:
-                            print(f"⚠️ 在AI摘要中未找到 {stock['code']} {stock['name']} 的原始信息")
-                except Exception as e:
-                    print(f"⚠️ 更新 {stock['code']} 实时数据失败: {e}")
-                    import traceback
-                    traceback.print_exc()
-        
-        final_summary = f"📅 **{today_str} 散户短线交易专用分析**\n\n{retail_analysis}{sentiment_section}{indices_section}{timing_section}{global_analysis}✍️ **今日分析总结：**\n{updated_summary}\n\n---\n\n"
-    else:
-        # AI摘要中未包含股票推荐，添加单独生成的股票推荐
-        final_summary = f"📅 **{today_str} 散户短线交易专用分析**\n\n{retail_analysis}{sentiment_section}{indices_section}{timing_section}{global_analysis}✍️ **今日分析总结：**\n{cleaned_summary}\n\n{stock_recommendations}---\n\n"
+    # 如果AI摘要中没有股票推荐，生成股票推荐部分
+    stock_recommendations = ""
+    if not has_stock_recommendations_in_summary:
+        stock_recommendations = stock_manager.generate_stock_recommendations_section(extracted_stocks)
+        print(f"✅ 生成股票推荐部分，长度: {len(stock_recommendations)}")
+
+    # 生成最终消息
+    retail_analysis = ""  # 预留字段（字符串格式）
+    
+    # 构建最终摘要（summary已经在process_summary中更新了实时数据）
+    final_summary = f"📅 **{today_str} 散户短线交易专用分析**\n\n{retail_analysis}{sentiment_section}{indices_section}{timing_section}{global_analysis}✍️ **今日分析总结：**\n{summary}\n\n{stock_recommendations}---\n\n"
     for category, content in articles_data.items():
         # 跳过美国经济和世界经济部分，不显示英文内容
         if category == "🇺🇸 美国经济" or category == "🌍 世界经济":
@@ -1636,9 +1426,30 @@ if __name__ == "__main__":
         if content.strip():
             final_summary += f"## {category}\n{content}\n\n"
 
-     # 推送到多个server酱key
-    # send_to_wechat(title=f"📌 {today_str} 财经新闻摘要", content=final_summary)
-    send_email_notification(
-        title=f"🎯 {today_str} 散户短线交易分析", 
-        content=final_summary
-    )
+    # 发送邮件通知（仅在配置了邮件信息时发送）
+    has_email_config = os.getenv("EMAIL_SENDER") and os.getenv("EMAIL_PASSWORD")
+    if not has_email_config:
+        # 尝试从本地配置加载
+        try:
+            from local_config import LOCAL_EMAIL_SENDER, LOCAL_EMAIL_PASSWORD
+            has_email_config = LOCAL_EMAIL_SENDER and LOCAL_EMAIL_PASSWORD
+        except ImportError:
+            pass
+    
+    if has_email_config:
+        send_email_notification(
+            title=f"🎯 {today_str} 散户短线交易分析", 
+            content=final_summary
+        )
+    else:
+        print("⚠️ 邮件未配置，跳过邮件发送（本地运行模式）")
+    
+    # 如果没有配置邮件，打印摘要到控制台（本地运行）
+    if not has_email_config:
+        print("\n" + "="*80)
+        print("📄 分析结果（本地运行模式）：")
+        print("="*80)
+        # 打印完整内容到控制台
+        print(final_summary)
+        print("="*80)
+        print(f"📊 完整分析内容长度: {len(final_summary)} 字符")
