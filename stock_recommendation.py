@@ -723,10 +723,11 @@ class StockRecommendationUpdater:
                         data_source = stock.real_time_data.get('data_source', 'N/A')
                         
                         # 匹配从股票标题到下一个股票或章节结束的所有内容
-                        pattern = rf"{re.escape(old_pattern)}.*?(?=\*\*\d{{6}}\s+\w+|\n##\s+|\n###\s+|\Z)"
+                        # 改进正则：匹配不带**的格式、带**的格式，以及下一个股票代码
+                        pattern = rf"{re.escape(old_pattern)}.*?(?=\d{{6}}\s+\w+|\*\*\d{{6}}\s+\w+\*\*|\n##\s+|\n###\s+|\Z)"
                         updated_summary = re.sub(
                             pattern, 
-                            new_stock_block.rstrip(), 
+                            new_stock_block,  # 保留换行和分隔符
                             updated_summary, 
                             flags=re.DOTALL
                         )
@@ -799,6 +800,9 @@ class StockRecommendationUpdater:
             volume_ratio = stock.real_time_data.get("volume_ratio", 1)
             volume_emoji = "🔥" if volume_ratio > 1.5 else "📊" if volume_ratio > 1 else "📉"
             block += f"成交量：{volume_emoji} 较20日均量 {volume_ratio:.1f}倍\n\n"
+        
+        # 添加分隔线，确保多个股票之间有明确分隔
+        block += "─" * 50 + "\n\n"
         
         return block
 
