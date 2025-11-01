@@ -1,4 +1,7 @@
 # 福生无量天尊
+import sys
+import io
+from contextlib import redirect_stdout, redirect_stderr
 from openai import OpenAI
 import feedparser
 import requests
@@ -9,7 +12,6 @@ import pytz
 import os
 import json
 import re
-import yfinance as yf
 import pandas as pd
 
 # 导入重构后的股票推荐模块
@@ -83,7 +85,7 @@ def today_date():
 # 爬取网页正文 (用于 AI 分析，但不展示)
 def fetch_article_text(url):
     try:
-        print(f"📰 正在爬取文章内容: {url}")
+        # print(f"📰 正在爬取文章内容: {url}")
         article = Article(url)
         article.download()
         article.parse()
@@ -253,27 +255,7 @@ def summarize(text, global_events=None):
 
 **如果没有合适的股票**：输出"当前新闻中未发现符合条件的股票推荐，建议关注板块机会。"
 
-## ⚠️ 风险提示
-- 新闻中提到的短期利空因素
-- 需要规避的板块（基于新闻）
-- 新闻反映的市场情绪变化信号
-
-## 💰 资金配置建议
-- 总仓位建议：基于新闻风险程度
-- 单笔投资比例：X-X%
-- 分散投资策略
-
-## 📊 操作策略
-- **买入时机**：结合新闻事件的时效性（如"X月X日政策发布前"）
-- **卖出策略**：分批止盈建议
-- **风险控制**：止损执行要点
-
-**✅ 输出前自我检查清单：**
-- [ ] 所有推荐理由都明确引用了新闻（包含"新闻中提到"、"根据新闻"等关键词）
-- [ ] 所有股票代码都是6位数字格式（000001、600000、300001等）
-- [ ] 没有推荐新闻中未提及的股票
-- [ ] 市值限制已遵守（≤500亿，除非新闻明确涉及大盘股）
-- [ ] 如果没有合适的股票，已明确说明"未发现符合条件的股票"
+**注意：不需要输出风险提示、资金配置建议、操作策略和自我检查清单部分，只输出股票推荐相关内容。**
 
 **推荐理由格式示例：**
 
@@ -378,24 +360,29 @@ def get_market_indices():
             "创业板指": "📊 数据获取中"
         }
 
-# 导入实时数据获取模块
+# 导入实时数据获取模块（可选，如果不存在将使用yfinance作为备用）
 try:
     from real_time_stock_data import RealTimeStockData
     realtime_data_client = RealTimeStockData()
     REALTIME_DATA_AVAILABLE = True
-    print("✅ 实时数据模块加载成功")
+    print("✅ 实时数据模块加载成功（使用实时数据源）")
 except ImportError:
-    print("⚠️ 实时数据模块未找到，将使用yfinance作为备用")
     REALTIME_DATA_AVAILABLE = False
+    print("ℹ️ 实时数据模块未找到（这是可选的），将使用yfinance作为数据源")
 
-# 检查yfinance是否可用
+# 检查yfinance是否可用（延迟导入，作为实时数据的备用）
 try:
     import yfinance as yf
     YFINANCE_AVAILABLE = True
-    print("✅ yfinance模块加载成功")
+    data_source_status = "实时数据源" if REALTIME_DATA_AVAILABLE else "yfinance（延迟约15分钟）"
+    print(f"✅ yfinance模块加载成功（当前使用: {data_source_status}）")
 except ImportError:
-    print("⚠️ yfinance模块未找到，将只使用实时数据")
+    yf = None
     YFINANCE_AVAILABLE = False
+    if REALTIME_DATA_AVAILABLE:
+        print("⚠️ yfinance模块未找到，将仅使用实时数据源")
+    else:
+        print("❌ yfinance模块未找到且实时数据模块不可用，股票数据获取功能将受限")
 
 # 获取实时股票数据（增强版）
 def get_real_time_stock_data(stock_code):
@@ -403,7 +390,7 @@ def get_real_time_stock_data(stock_code):
     try:
         # 首先尝试获取实时数据
         if REALTIME_DATA_AVAILABLE:
-            print(f"🔍 正在获取 {stock_code} 的实时数据...")
+            # print(f"🔍 正在获取 {stock_code} 的实时数据...")
             realtime_data = realtime_data_client.get_realtime_data_multi_source(stock_code)
             
             if realtime_data and realtime_data.get("current_price", 0) > 0:
@@ -522,7 +509,7 @@ def get_real_time_stock_data(stock_code):
         
         # 如果实时数据不可用，尝试使用yfinance作为备用
         if YFINANCE_AVAILABLE:
-            print(f"🔍 使用yfinance获取 {stock_code} 数据...")
+            # print(f"🔍 使用yfinance获取 {stock_code} 数据...")
             
             # 转换A股代码格式（添加.SS或.SZ后缀）
             if stock_code.startswith('6'):
@@ -588,7 +575,7 @@ def get_real_time_stock_data(stock_code):
                 "update_time": "延迟数据"
             }
             
-            print(f"✅ {stock_code} yfinance数据获取成功: ¥{result['current_price']} ({result['price_change']}%)")
+            # print(f"✅ {stock_code} yfinance数据获取成功: ¥{result['current_price']} ({result['price_change']}%)")
             return result
         else:
             print(f"❌ 实时数据和yfinance都不可用")
@@ -1323,28 +1310,28 @@ if __name__ == "__main__":
     # 获取新闻内容（优先使用增强源，如果可用）
     if USE_ENHANCED_SOURCES:
         print("🚀 使用增强新闻源获取资讯...")
-        enhanced_sources = EnhancedNewsSources()
-        articles_data, analysis_text = enhanced_sources.get_all_news(max_articles_per_source=5)
+        # 抑制jieba等库的初始化输出
+        _suppress_output = io.StringIO()
+        with redirect_stdout(_suppress_output), redirect_stderr(_suppress_output):
+            enhanced_sources = EnhancedNewsSources()
+            articles_data, analysis_text = enhanced_sources.get_all_news(max_articles_per_source=5)
         print(f"✅ 增强源获取完成，分析文本长度: {len(analysis_text)} 字符")
     else:
         print("📡 使用基础RSS源获取资讯...")
         articles_data, analysis_text = fetch_rss_articles(rss_feeds, max_articles=5)
     
-    # 获取市场情绪数据和时机分析
+    # 获取市场情绪数据（市场时机分析已移除）
     sentiment_data = get_market_sentiment()
-    timing_analysis = analyze_market_timing()
     
     # 获取实时市场指数数据
     print("📊 正在获取实时市场数据...")
     market_indices = get_market_indices()
     
-    # 从新闻中提取相关行业（包含全球联动分析）
+    # 从新闻中提取相关行业（全球联动分析仅用于AI分析，不在输出中显示）
     related_industries, global_events = extract_industries_from_news(analysis_text)
     print(f"🔍 检测到相关行业: {related_industries}")
-    if global_events:
-        print(f"🌍 检测到全球联动事件: {[event['事件'] for event in global_events]}")
     
-    # AI生成摘要（包含全球联动分析）
+    # AI生成摘要（全球联动分析仅用于AI分析）
     summary = summarize(analysis_text, global_events)
     print(f"📝 AI生成的摘要长度: {len(summary)}")
     print(f"📝 摘要是否包含'具体股票推荐': {'具体股票推荐' in summary}")
@@ -1380,22 +1367,9 @@ if __name__ == "__main__":
         indices_section += f"- **{key}**: {value}\n"
     indices_section += "\n"
     
-    # 添加市场时机分析
-    timing_section = "## ⏰ 市场时机分析\n"
-    for key, value in timing_analysis.items():
-        timing_section += f"- **{key}**: {value}\n"
-    timing_section += "\n"
-    
-    # 生成全球联动分析部分
+    # 市场时机分析和全球市场联动分析已移除
+    timing_section = ""
     global_analysis = ""
-    if global_events:
-        global_analysis = "## 🌍 全球市场联动分析\n"
-        for event in global_events:
-            global_analysis += f"- **{event['事件']}**\n"
-            global_analysis += f"  - 影响逻辑: {event['逻辑']}\n"
-            global_analysis += f"  - 影响行业: {', '.join(event['影响行业'])}\n"
-            global_analysis += f"  - 国内映射: {', '.join(event['国内映射'])}\n\n"
-        global_analysis += "💡 **联动提示**: 全球事件通过资金流向、情绪传导、供应链影响等方式影响A股市场\n\n"
 
     # 生成股票推荐部分（仅用于AI摘要中没有股票推荐的情况）
     # 检查AI摘要中是否已经包含股票推荐部分
@@ -1418,13 +1392,10 @@ if __name__ == "__main__":
     retail_analysis = ""  # 预留字段（字符串格式）
     
     # 构建最终摘要（summary已经在process_summary中更新了实时数据）
-    final_summary = f"📅 **{today_str} 散户短线交易专用分析**\n\n{retail_analysis}{sentiment_section}{indices_section}{timing_section}{global_analysis}✍️ **今日分析总结：**\n{summary}\n\n{stock_recommendations}---\n\n"
-    for category, content in articles_data.items():
-        # 跳过美国经济和世界经济部分，不显示英文内容
-        if category == "🇺🇸 美国经济" or category == "🌍 世界经济":
-            continue
-        if content.strip():
-            final_summary += f"## {category}\n{content}\n\n"
+    # 移除新闻源列表、风险提示、资金配置建议、操作策略等部分
+    final_summary = f"📅 **{today_str} 散户短线交易专用分析**\n\n{retail_analysis}{sentiment_section}{indices_section}{timing_section}{global_analysis}✍️ **今日分析总结：**\n{summary}\n\n{stock_recommendations}"
+    
+    # 不再输出新闻源列表（已移除）
 
     # 发送邮件通知（仅在配置了邮件信息时发送）
     has_email_config = os.getenv("EMAIL_SENDER") and os.getenv("EMAIL_PASSWORD")

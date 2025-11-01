@@ -161,14 +161,13 @@ class EnhancedNewsSources:
             category_articles = 0
             
             for source_name, url in sources.items():
-                print(f"📡 正在获取 {source_name}...")
                 feed = self.fetch_rss_feed(url)
                 
                 if not feed:
-                    print(f"❌ {source_name} 获取失败")
+                    # print(f"❌ {source_name} 获取失败")
                     continue
                 
-                print(f"✅ {source_name} 获取成功，共 {len(feed.entries)} 条")
+                # print(f"✅ {source_name} 获取成功，共 {len(feed.entries)} 条")
                 successful_sources += 1
                 articles = []
                 
